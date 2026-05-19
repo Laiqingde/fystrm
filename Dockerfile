@@ -34,6 +34,7 @@ COPY --from=builder /opt/venv /opt/venv
 COPY pyproject.toml uv.lock alembic.ini ./
 COPY alembic ./alembic
 COPY fystrm ./fystrm
+COPY scripts ./scripts
 
 EXPOSE 8095
 
