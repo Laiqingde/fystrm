@@ -1,35 +1,31 @@
-"""扫描器：递归遍历目录，过滤出视频文件。
-
-通过 DrivePlugin 抽象访问文件系统，未来真实网盘也能复用同一份代码。
-v0.1 走 LocalDrivePlugin。
-"""
+"""扫描器：递归遍历目录，过滤出视频文件 + 同目录字幕。"""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from pathlib import PurePosixPath
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 
 from loguru import logger
 
+from fystrm.engines.subtitle import find_subtitles
 from fystrm.plugins.drives.base import DriveFile, DrivePlugin
 
-# 媒体文件后缀（保守列表，过滤掉字幕/海报/nfo）
 VIDEO_EXTENSIONS: frozenset[str] = frozenset({
     ".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm",
     ".m4v", ".mpg", ".mpeg", ".ts", ".m2ts", ".rmvb", ".rm",
     ".iso", ".vob",
 })
 
-# 排除的小文件阈值（小于此大小的视频通常是 sample / 预告片）
-MIN_VIDEO_SIZE = 100 * 1024 * 1024  # 100 MB
+MIN_VIDEO_SIZE = 100 * 1024 * 1024
 
 
 @dataclass(slots=True, frozen=True)
 class ScannedFile:
     drive_file: DriveFile
-    rel_path: str  # 相对于扫描源根的路径
+    rel_path: str
     ext: str
+    sidecar_subtitles: tuple = field(default_factory=tuple)  # tuple[Subtitle, ...]
 
 
 def is_video(name: str) -> bool:
@@ -42,29 +38,19 @@ async def scan_directory(
     *,
     min_size: int = MIN_VIDEO_SIZE,
     follow_dirs: bool = True,
+    detect_subtitles: bool = True,
 ) -> AsyncIterator[ScannedFile]:
-    """递归扫描，async 生成 ScannedFile 流。
-
-    Args:
-        drive: 网盘插件实例
-        root: 扫描根目录（drive 内的路径）
-        min_size: 过滤小文件
-        follow_dirs: 是否递归子目录
-    """
     stack: list[str] = [root]
     while stack:
         cur = stack.pop()
         try:
             entries = await drive.list(cur)
         except FileNotFoundError:
-            logger.warning("path not found, skip: {}", cur)
-            continue
+            logger.warning("path not found, skip: {}", cur); continue
         except NotADirectoryError:
-            logger.warning("not a directory, skip: {}", cur)
-            continue
+            logger.warning("not a directory, skip: {}", cur); continue
         except Exception as e:
-            logger.error("list failed on {}: {}", cur, e)
-            continue
+            logger.error("list failed on {}: {}", cur, e); continue
         for entry in entries:
             if entry.is_dir:
                 if follow_dirs:
@@ -76,16 +62,17 @@ async def scan_directory(
                 logger.debug("skip small file: {} ({} bytes)", entry.path, entry.size)
                 continue
             rel = _relpath(entry.path, root)
+            subs = tuple(find_subtitles(Path(entry.path))) if detect_subtitles else tuple()
             yield ScannedFile(
                 drive_file=entry,
                 rel_path=rel,
                 ext=PurePosixPath(entry.name).suffix.lower(),
+                sidecar_subtitles=subs,
             )
 
 
 def _relpath(path: str, root: str) -> str:
-    p = PurePosixPath(path)
-    r = PurePosixPath(root)
+    p = PurePosixPath(path); r = PurePosixPath(root)
     try:
         return str(p.relative_to(r))
     except ValueError:

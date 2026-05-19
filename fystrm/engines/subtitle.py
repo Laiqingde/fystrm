@@ -95,33 +95,55 @@ def copy_subtitles(subs: list[Subtitle], target_dir: Path, basename: str) -> lis
 def _matches_video(sub_stem: str, video_stem: str) -> bool:
     """字幕 stem 匹配视频 stem。
 
-    精确匹配 / 以 video_stem 开头（允许后缀如 .zh / .chs / -en）。
+    双向 prefix 匹配:
+    - 精确匹配
+    - 字幕 stem 以 video_stem 开头（字幕加了语言后缀）
+    - 视频 stem 以字幕 stem 去掉语言后缀的"核心部分"开头
+      （字幕只有 Show.S01E01.zh, 视频 Show.S01E01.1080p.BluRay 这种情况）
     """
     sub_low = sub_stem.lower()
     vid_low = video_stem.lower()
     if sub_low == vid_low:
         return True
-    return sub_low.startswith(vid_low) and (len(sub_low) <= len(vid_low) + 25)
+    if sub_low.startswith(vid_low) and (len(sub_low) <= len(vid_low) + 25):
+        return True
+    # 反向匹配: 字幕 stem 仅砍最后一段（语言后缀），剩下的核心要等于视频 stem 的前缀,
+    # 且视频后紧跟分隔符 (避免 S01E01 匹配 S01E0X)
+    parts = sub_low.split(".")
+    if len(parts) >= 2:
+        core = ".".join(parts[:-1])
+        if len(core) >= 8:
+            if vid_low == core or (vid_low.startswith(core) and vid_low[len(core):len(core)+1] == "."):
+                return True
+    return False
 
 
 def _detect_lang(sub_stem: str, video_stem: str) -> str:
     """从字幕 stem 推断语言。
 
-    去掉 video_stem 前缀后，尝试匹配语言 token。
+    取字幕 stem 中相对于 video_stem 的额外部分作为后缀候选；
+    如果字幕短于视频，则取字幕末尾分段作为候选。
     """
-    if sub_stem.lower() == video_stem.lower():
+    sub_low = sub_stem.lower()
+    vid_low = video_stem.lower()
+    if sub_low == vid_low:
         return "und"
-    suffix = sub_stem[len(video_stem):].lstrip(".-_ ").lower()
+
+    # 情况 1: 字幕以 video_stem 为前缀，多出来的就是语言后缀
+    if sub_low.startswith(vid_low):
+        suffix = sub_low[len(vid_low):]
+    else:
+        # 情况 2: 字幕更短 -> 取末尾的 "." 段
+        suffix = sub_low.rsplit(".", 1)[-1] if "." in sub_low else ""
+
+    suffix = suffix.lstrip(".-_ ")
     if not suffix:
         return "und"
 
-    # 优先匹配最长的 token
     candidates = _LANG_TOKEN_RE.findall(suffix)
     for token in candidates:
         if token.lower() in _LANG_MAP:
             return _LANG_MAP[token.lower()]
-
-    # 含某些字符直接判定
     if any(k in suffix for k in ("chs", "sc", "zh")):
         return "zh"
     if any(k in suffix for k in ("eng", "en")):
