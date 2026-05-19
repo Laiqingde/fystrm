@@ -3,10 +3,10 @@ from loguru import logger
 
 from fystrm.config import settings
 from fystrm.core.logger import setup_logging
+from fystrm.tasks.scan import scan_library_task
 
 
 async def ping(ctx: dict) -> str:
-    """占位任务，Stage 5 会被真实 task 取代。"""
     logger.info("ping task invoked")
     return "pong"
 
@@ -26,6 +26,8 @@ class WorkerSettings:
         port=settings.redis_port,
         database=settings.redis_db,
     )
-    functions = [ping]
+    functions = [ping, scan_library_task]
     on_startup = startup
     on_shutdown = shutdown
+    job_timeout = 1800  # 30min, 大目录扫描留时间
+    max_jobs = 4
