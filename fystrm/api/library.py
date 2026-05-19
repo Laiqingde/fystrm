@@ -17,9 +17,13 @@ class LibraryIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=128)
     source_path: str = Field(..., min_length=1)
     target_strm_path: str = Field(..., min_length=1)
-    cd2_mount_prefix: str = Field(..., min_length=1)
+    cd2_mount_prefix: str = Field(default="", description="cd2_local 模式下的 CD2 路径前缀")
     media_type: str = Field("movie", pattern="^(movie|tv|mixed)$")
     enabled: bool = True
+    # v0.2 新字段
+    strm_mode: str = Field("cd2_local", pattern="^(cd2_local|webdav)$")
+    webdav_base_url: str | None = None
+    webdav_path_prefix: str | None = None
 
 
 class LibraryOut(LibraryIn):
@@ -82,6 +86,9 @@ def _serialize(lib: Library) -> dict:
         "cd2_mount_prefix": lib.cd2_mount_prefix,
         "media_type": lib.media_type,
         "enabled": lib.enabled,
+        "strm_mode": lib.strm_mode,
+        "webdav_base_url": lib.webdav_base_url,
+        "webdav_path_prefix": lib.webdav_path_prefix,
         "last_scan_at": lib.last_scan_at,
         "created_at": lib.created_at,
         "updated_at": lib.updated_at,

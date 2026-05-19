@@ -22,12 +22,17 @@ class MediaItemOut(BaseModel):
     year: Optional[int] = None
     tmdb_id: Optional[str] = None
     media_type: str
+    season: Optional[int] = None
+    episode: Optional[int] = None
+    episode_title: Optional[str] = None
+    parent_tmdb_id: Optional[str] = None
     source_file_path: str
     source_file_size: int
     strm_path: Optional[str] = None
     nfo_path: Optional[str] = None
     poster_path: Optional[str] = None
     fanart_path: Optional[str] = None
+    subtitle_paths: Optional[list[str]] = None
     scrape_status: str
     scrape_error: Optional[str] = None
     created_at: datetime
@@ -37,7 +42,7 @@ class MediaItemOut(BaseModel):
 async def list_media(
     library_id: int | None = Query(None),
     status: str | None = Query(None),
-    limit: int = 100,
+    limit: int = 200,
     db: AsyncSession = Depends(get_session),
 ) -> list[MediaItemOut]:
     q = select(MediaItem).order_by(desc(MediaItem.id)).limit(limit)
@@ -53,9 +58,13 @@ def _serialize(m: MediaItem) -> dict:
     return {
         "id": m.id, "library_id": m.library_id, "title": m.title,
         "original_title": m.original_title, "year": m.year, "tmdb_id": m.tmdb_id,
-        "media_type": m.media_type, "source_file_path": m.source_file_path,
-        "source_file_size": m.source_file_size, "strm_path": m.strm_path,
-        "nfo_path": m.nfo_path, "poster_path": m.poster_path, "fanart_path": m.fanart_path,
+        "media_type": m.media_type,
+        "season": m.season, "episode": m.episode, "episode_title": m.episode_title,
+        "parent_tmdb_id": m.parent_tmdb_id,
+        "source_file_path": m.source_file_path, "source_file_size": m.source_file_size,
+        "strm_path": m.strm_path, "nfo_path": m.nfo_path,
+        "poster_path": m.poster_path, "fanart_path": m.fanart_path,
+        "subtitle_paths": m.subtitle_paths,
         "scrape_status": m.scrape_status, "scrape_error": m.scrape_error,
         "created_at": m.created_at,
     }

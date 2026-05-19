@@ -11,6 +11,10 @@ export interface Library {
   media_type: string;
   enabled: boolean;
   last_scan_at: string | null;
+  // v0.2
+  strm_mode: string;
+  webdav_base_url: string | null;
+  webdav_path_prefix: string | null;
 }
 
 export interface ScanTask {
@@ -35,12 +39,17 @@ export interface MediaItem {
   year: number | null;
   tmdb_id: string | null;
   media_type: string;
+  season: number | null;
+  episode: number | null;
+  episode_title: string | null;
+  parent_tmdb_id: string | null;
   source_file_path: string;
   source_file_size: number;
   strm_path: string | null;
   nfo_path: string | null;
   poster_path: string | null;
   fanart_path: string | null;
+  subtitle_paths: string[] | null;
   scrape_status: string;
   scrape_error: string | null;
   created_at: string;

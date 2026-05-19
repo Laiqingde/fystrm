@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, h, computed } from "vue";
-import { NCard, NDataTable, NTag, NInput, NSelect, NSpace } from "naive-ui";
+import { onMounted, ref, h } from "vue";
+import { NCard, NDataTable, NTag, NSelect, NSpace } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import { listMedia, type MediaItem } from "../api";
 
@@ -27,18 +27,47 @@ const statusColor = (s: string) => ({
 } as Record<string, any>)[s] || "default";
 
 const columns: DataTableColumns<MediaItem> = [
-  { title: "ID", key: "id", width: 60 },
-  { title: "标题", key: "title", width: 200 },
-  { title: "年份", key: "year", width: 80 },
-  { title: "TMDB", key: "tmdb_id", width: 100 },
-  { title: "类型", key: "media_type", width: 80 },
-  { title: "大小", key: "size", width: 100, render: (row) => fmtSize(row.source_file_size) },
-  { title: "源文件", key: "source_file_path", ellipsis: { tooltip: true } },
+  { title: "ID", key: "id", width: 50 },
+  { title: "标题", key: "title", width: 180,
+    render(row) {
+      if (row.media_type !== "movie" && row.episode_title) {
+        return h("div", {}, [
+          h("div", { style: "font-weight: 500;" }, row.title),
+          h("div", { style: "font-size: 12px; opacity: 0.7;" }, row.episode_title),
+        ]);
+      }
+      return row.title;
+    },
+  },
+  { title: "年份", key: "year", width: 70 },
+  { title: "TMDB", key: "tmdb_id", width: 90 },
+  { title: "类型", key: "media_type", width: 70 },
+  {
+    title: "S/E",
+    key: "se",
+    width: 80,
+    render(row) {
+      if (row.season != null && row.episode != null) {
+        return `S${String(row.season).padStart(2,"0")}E${String(row.episode).padStart(2,"0")}`;
+      }
+      return "—";
+    },
+  },
+  { title: "大小", key: "size", width: 80, render: (row) => fmtSize(row.source_file_size) },
+  {
+    title: "字幕",
+    key: "subs",
+    width: 70,
+    render(row) {
+      if (!row.subtitle_paths || row.subtitle_paths.length === 0) return "—";
+      return h(NTag, { type: "info", size: "small" }, { default: () => `${row.subtitle_paths!.length}` });
+    },
+  },
   { title: "strm", key: "strm_path", ellipsis: { tooltip: true } },
   {
     title: "状态",
     key: "scrape_status",
-    width: 100,
+    width: 90,
     render: (row) => h(NTag, { type: statusColor(row.scrape_status), size: "small" }, { default: () => row.scrape_status }),
   },
 ];
