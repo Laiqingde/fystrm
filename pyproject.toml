@@ -1,0 +1,55 @@
+[project]
+name = "fystrm"
+version = "0.1.0"
+description = "Open-source media library middleware for CloudDrive2 + Emby (strm-based)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Web
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.20",
+    "websockets>=14",
+    # HTTP
+    "httpx>=0.28",
+    # DB
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "psycopg2-binary>=2.9",
+    # Queue
+    "arq>=0.26",
+    "redis>=5.2",
+    # Scheduler
+    "apscheduler>=3.11",
+    # Config / Validation
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    # Logging
+    "loguru>=0.7",
+    # Media identification
+    "guessit>=3.8",
+    "anitopy>=2.1.1",
+    # TMDB
+    "tmdbsimple>=2.9",
+    # Util
+    "python-slugify>=8",
+    "tenacity>=9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]

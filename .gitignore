@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# uv
+# uv.lock should be committed
+.python-version
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Data
+data/
+media/
+scan-source/
+
+# Frontend
+node_modules/
+web/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Docker
+.docker/
