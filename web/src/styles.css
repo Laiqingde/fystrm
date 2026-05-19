@@ -1,0 +1,52 @@
+:root {
+  --fystrm-radius: 12px;
+  --fystrm-radius-sm: 8px;
+  --fystrm-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  --fystrm-shadow-strong: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+html.dark {
+  --fystrm-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
+  --fystrm-shadow-strong: 0 12px 32px rgba(0,0,0,0.5);
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
+
+/* 卡片 hover 微交互 */
+.n-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.fystrm-hover-lift:hover { transform: translateY(-2px); box-shadow: var(--fystrm-shadow-strong); }
+
+/* 顶部 bar 渐变 hover */
+.fystrm-menu-item { transition: color 0.15s ease, background 0.15s ease; }
+
+/* logo 文字渐变 */
+.fystrm-logo-text {
+  background: linear-gradient(135deg, #5b8def, #b56bff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+/* Stat tile 内边距 */
+.fystrm-stat { display: flex; align-items: center; gap: 16px; }
+.fystrm-stat-icon {
+  width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  font-size: 24px;
+}
+.fystrm-stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.fystrm-stat-label { font-size: 13px; opacity: 0.65; }
