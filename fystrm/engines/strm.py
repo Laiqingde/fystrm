@@ -1,22 +1,24 @@
-"""strm 文件生成: 给定路径上下文 + 标题/年份，写 .strm + 落 nfo/poster。
+"""strm + nfo + poster 输出。
 
-输出目录结构（Emby 标准）：
-  {target_strm_path}/{title} ({year})/
-    ├── {title}.strm     # 内容 = cd2 路径
-    ├── movie.nfo
-    ├── poster.jpg
-    └── fanart.jpg
+布局:
+  电影: {target_root}/{title} ({year})/{title}.strm + movie.nfo + poster + fanart
+  剧集: {target_root}/{title} ({year})/                ← tvshow.nfo + poster + fanart 在根
+                                  /Season 01/        ← 季海报 poster.jpg (可选)
+                                            /{title} - S01E01.strm
+                                            /{title} - S01E01.nfo
+                                            /{title} - S01E01-thumb.jpg (still)
+                                            /{title} - S01E01.zh.ass (字幕由 subtitle 引擎补)
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from loguru import logger
 
-from fystrm.engines.nfo import build_movie_nfo
+from fystrm.engines.nfo import build_episode_nfo, build_movie_nfo, build_tvshow_nfo
 from fystrm.engines.poster import download_image
 from fystrm.plugins.meta.base import MediaMeta
 from fystrm.plugins.strm_path.base import StrmContext, StrmPathPlugin
@@ -24,27 +26,33 @@ from fystrm.plugins.strm_path.base import StrmContext, StrmPathPlugin
 
 @dataclass(slots=True, frozen=True)
 class StrmArtifacts:
-    """生成的所有产物路径（绝对路径）。"""
     out_dir: Path
     strm_path: Path
     nfo_path: Path
-    poster_path: Path | None
-    fanart_path: Path | None
+    poster_path: Path | None = None
+    fanart_path: Path | None = None
+    still_path: Path | None = None
+    season_dir: Path | None = None         # episode 模式
+    tvshow_nfo_path: Path | None = None    # episode 模式
 
 
-# 文件系统不能用的字符
 _INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 def sanitize_dirname(name: str) -> str:
-    """文件夹名安全化：替换非法字符 + 去首尾空白/点。"""
     name = _INVALID_CHARS.sub(" ", name)
-    name = re.sub(r"\s+", " ", name).strip()
-    name = name.rstrip(".")
+    name = re.sub(r"\s+", " ", name).strip().rstrip(".")
     return name or "unknown"
 
 
-async def generate_strm(
+def movie_root_dir(target_root: Path, meta: MediaMeta) -> Path:
+    folder = sanitize_dirname(meta.title)
+    if meta.year:
+        folder = f"{folder} ({meta.year})"
+    return target_root / folder
+
+
+async def generate_movie_strm(
     meta: MediaMeta,
     target_root: Path,
     strm_path_plugin: StrmPathPlugin,
@@ -52,53 +60,94 @@ async def generate_strm(
     *,
     download_artwork: bool = True,
 ) -> StrmArtifacts:
-    """按 Emby 标准布局生成 strm + nfo + poster。
-
-    Args:
-        meta: TMDB 元数据
-        target_root: 媒体库根目录（绝对路径）
-        strm_path_plugin: 决定 strm 文件内容的插件
-        strm_ctx: 给 strm_path_plugin.render 的上下文
-        download_artwork: 是否下载 poster/fanart
-    """
-    # 文件夹名：标题 (年份)
-    folder_name = sanitize_dirname(meta.title)
-    if meta.year:
-        folder_name = f"{folder_name} ({meta.year})"
-    out_dir = target_root / folder_name
+    out_dir = movie_root_dir(target_root, meta)
     out_dir.mkdir(parents=True, exist_ok=True)
+    base = sanitize_dirname(meta.title)
 
-    # 文件名（不带年份的标题，更符合 Emby 习惯）
-    base_name = sanitize_dirname(meta.title)
-
-    # 1. 写 strm
     strm_content = strm_path_plugin.render(strm_ctx)
-    strm_path = out_dir / f"{base_name}.strm"
+    strm_path = out_dir / f"{base}.strm"
     strm_path.write_text(strm_content, encoding="utf-8")
-    logger.info("strm -> {} -> {}", strm_path, strm_content)
+    logger.info("movie strm -> {}", strm_path)
 
-    # 2. 写 nfo
-    nfo_xml = build_movie_nfo(meta)
     nfo_path = out_dir / "movie.nfo"
-    nfo_path.write_text(nfo_xml, encoding="utf-8")
+    nfo_path.write_text(build_movie_nfo(meta), encoding="utf-8")
 
-    # 3. 海报
-    poster_path: Path | None = None
-    fanart_path: Path | None = None
+    poster_path = fanart_path = None
     if download_artwork:
         if meta.poster_url:
-            target = out_dir / "poster.jpg"
-            if await download_image(meta.poster_url, target):
-                poster_path = target
+            t = out_dir / "poster.jpg"
+            if await download_image(meta.poster_url, t):
+                poster_path = t
         if meta.fanart_url:
-            target = out_dir / "fanart.jpg"
-            if await download_image(meta.fanart_url, target):
-                fanart_path = target
+            t = out_dir / "fanart.jpg"
+            if await download_image(meta.fanart_url, t):
+                fanart_path = t
 
     return StrmArtifacts(
-        out_dir=out_dir,
-        strm_path=strm_path,
-        nfo_path=nfo_path,
-        poster_path=poster_path,
-        fanart_path=fanart_path,
+        out_dir=out_dir, strm_path=strm_path, nfo_path=nfo_path,
+        poster_path=poster_path, fanart_path=fanart_path,
+    )
+
+
+async def generate_episode_strm(
+    tv_meta: MediaMeta,
+    episode_meta: MediaMeta,
+    target_root: Path,
+    strm_path_plugin: StrmPathPlugin,
+    strm_ctx: StrmContext,
+    *,
+    download_artwork: bool = True,
+    tvshow_lock_set: set | None = None,
+) -> StrmArtifacts:
+    """生成单集 strm + episode nfo + 集截图，并按需写 tvshow.nfo / 剧集根海报。
+
+    tvshow_lock_set: set of tmdb_id; 同一 set 内只在第一次见到时写 tvshow.nfo。
+                     一个 ScanTask 共用一个 set。
+    """
+    show_dir = movie_root_dir(target_root, tv_meta)  # 复用同样的 {title} ({year}) 布局
+    show_dir.mkdir(parents=True, exist_ok=True)
+
+    season = episode_meta.season_number or 0
+    episode = episode_meta.episode_number or 0
+    season_dir = show_dir / f"Season {season:02d}"
+    season_dir.mkdir(parents=True, exist_ok=True)
+
+    show_base = sanitize_dirname(tv_meta.title)
+    ep_base = f"{show_base} - S{season:02d}E{episode:02d}"
+
+    # strm
+    strm_content = strm_path_plugin.render(strm_ctx)
+    strm_path = season_dir / f"{ep_base}.strm"
+    strm_path.write_text(strm_content, encoding="utf-8")
+    logger.info("episode strm -> {}", strm_path)
+
+    # nfo
+    nfo_path = season_dir / f"{ep_base}.nfo"
+    nfo_path.write_text(build_episode_nfo(episode_meta, parent_meta=tv_meta), encoding="utf-8")
+
+    still_path = None
+    if download_artwork and episode_meta.still_url:
+        t = season_dir / f"{ep_base}-thumb.jpg"
+        if await download_image(episode_meta.still_url, t):
+            still_path = t
+
+    # 一次性写 tvshow.nfo + 剧集根海报（仅第一次见到该剧时）
+    tvshow_nfo_path = None
+    if tvshow_lock_set is None or tv_meta.source_id not in tvshow_lock_set:
+        tvshow_nfo_path = show_dir / "tvshow.nfo"
+        tvshow_nfo_path.write_text(build_tvshow_nfo(tv_meta), encoding="utf-8")
+        if download_artwork:
+            if tv_meta.poster_url:
+                await download_image(tv_meta.poster_url, show_dir / "poster.jpg")
+            if tv_meta.fanart_url:
+                await download_image(tv_meta.fanart_url, show_dir / "fanart.jpg")
+        if tvshow_lock_set is not None:
+            tvshow_lock_set.add(tv_meta.source_id)
+
+    return StrmArtifacts(
+        out_dir=season_dir, strm_path=strm_path, nfo_path=nfo_path,
+        still_path=still_path, season_dir=season_dir,
+        tvshow_nfo_path=tvshow_nfo_path,
+        poster_path=(show_dir / "poster.jpg") if (show_dir / "poster.jpg").exists() else None,
+        fanart_path=(show_dir / "fanart.jpg") if (show_dir / "fanart.jpg").exists() else None,
     )
