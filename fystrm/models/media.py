@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fystrm.db import Base
@@ -32,6 +32,13 @@ class MediaItem(Base, TimestampMixin):
     nfo_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     poster_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     fanart_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+    # v0.2 剧集字段
+    season: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    episode: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    episode_title: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    parent_tmdb_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    subtitle_paths: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # List[str]
 
     # 刮削状态
     scrape_status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")  # pending/done/failed/skipped
