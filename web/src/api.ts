@@ -78,3 +78,17 @@ export const listMedia = (library_id?: number, status?: string) => {
   return api.get<MediaItem[]>("/api/media/", { params }).then(r => r.data);
 };
 export const getSettings = () => api.get<Settings>("/api/settings/").then(r => r.data);
+
+export interface DashboardStats {
+  media_count: number;
+  library_count: number;
+  task_count: number;
+  total_size: number;
+  by_status: Record<string, number>;
+  by_type: Record<string, number>;
+  trend_7d: { date: string; success: number; failed: number; tasks: number }[];
+  recent_tasks: { id: number; library_id: number; status: string; total_files: number; processed_files: number; success_count: number; failed_count: number; started_at: string | null; finished_at: string | null }[];
+  recent_media: { id: number; title: string; year: number | null; media_type: string; season: number | null; episode: number | null; episode_title: string | null; tmdb_id: string | null; scrape_status: string; poster_path: string | null }[];
+}
+
+export const getDashboardStats = () => api.get<DashboardStats>("/api/dashboard/stats").then(r => r.data);
