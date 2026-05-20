@@ -51,26 +51,25 @@ def identify(filename: str, *, hint_type: str | None = None) -> IdentifyResult:
     if season is not None or episode is not None:
         media_type = "tv"
 
-    # 动漫 fallback: 如果 guessit 给的 title 看起来不正常（含大量罗马音/japanese 标识）
-    # 用 anitopy 再试一次
+    # 动漫 fallback: 仅当有 episode_number 时才视为 anime
+    # (动漫一般 [字幕组] 标识 + 集号; 电影即便有 [tag] 也无集号)
     if _looks_like_anime(filename):
         try:
             ani = anitopy.parse(filename) or {}
+            ani_episode = ani.get("episode_number")
             ani_title = ani.get("anime_title")
-            if ani_title and len(str(ani_title)) > 1:
-                title = str(ani_title)
-                media_type = "anime"
-                if ani.get("anime_year"):
-                    try:
-                        year = int(str(ani["anime_year"]))
-                    except (TypeError, ValueError):
-                        pass
-                if ani.get("episode_number"):
-                    try:
-                        episode = int(str(ani["episode_number"]))
-                        media_type = "anime"
-                    except (TypeError, ValueError):
-                        pass
+            if ani_episode and ani_title and len(str(ani_title)) > 1:
+                try:
+                    episode = int(str(ani_episode))
+                    title = str(ani_title)
+                    media_type = "anime"
+                    if ani.get("anime_year"):
+                        try:
+                            year = int(str(ani["anime_year"]))
+                        except (TypeError, ValueError):
+                            pass
+                except (TypeError, ValueError):
+                    pass
         except Exception as e:
             logger.debug("anitopy parse failed for {}: {}", filename, e)
 
@@ -96,6 +95,6 @@ def _fallback_title(filename: str) -> str:
 
 def _looks_like_anime(filename: str) -> bool:
     name = filename.lower()
-    markers = ["[", "]", " - ", "raw", "bd-rip", "bd ", "anime", "[fansub"]
+    markers = ["[", "]", "raw", "bd-rip", "anime", "fansub", "动漫"]
     bracket_count = name.count("[") + name.count("]")
     return bracket_count >= 2 or any(m in name for m in markers)
