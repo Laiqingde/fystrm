@@ -55,6 +55,7 @@ services:
       - ./scan-source:/scan-source:ro
       - ./media:/media
       - ./data/config:/config
+      - /mnt:/mnt:ro
     ports:
       - "0.0.0.0:8095:8095"      # 公网开放
     healthcheck:
@@ -85,6 +86,7 @@ services:
       - ./scan-source:/scan-source:ro
       - ./media:/media
       - ./data/config:/config
+      - /mnt:/mnt:ro
     command: ["arq", "fystrm.tasks.worker.WorkerSettings"]
     healthcheck:
       disable: true
