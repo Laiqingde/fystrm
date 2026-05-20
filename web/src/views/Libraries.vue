@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, h, computed } from "vue";
+import { onMounted, ref, h, computed, watch } from "vue";
 import {
   NCard, NDataTable, NButton, NSpace, NModal, NForm, NFormItem, NInput, NSelect,
-  NTag, NPopconfirm, NIcon, NTooltip, useMessage,
+  NTag, NPopconfirm, NIcon, NTooltip, NCheckbox, useMessage,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import {
@@ -18,10 +18,18 @@ const showCreate = ref(false);
 
 const defaultForm = () => ({
   name: "", source_path: "", target_strm_path: "", cd2_mount_prefix: "",
-  media_type: "movie", enabled: true,
+  media_type: "mixed", enabled: true,
   strm_mode: "cd2_local", webdav_base_url: "", webdav_path_prefix: "",
+  same_as_source: true,
 });
 const form = ref(defaultForm());
+
+// 联动: same_as_source 勾选时 cd2_mount_prefix 跟随 source_path
+watch(() => [form.value.source_path, form.value.same_as_source], () => {
+  if (form.value.same_as_source) {
+    form.value.cd2_mount_prefix = form.value.source_path;
+  }
+}, { immediate: true });
 
 async function load() {
   loading.value = true;
@@ -36,6 +44,7 @@ async function submit() {
     message.warning("WebDAV 模式需要 base_url"); return;
   }
   const payload: any = { ...form.value };
+  delete payload.same_as_source;
   if (payload.strm_mode !== "webdav") {
     payload.webdav_base_url = null;
     payload.webdav_path_prefix = null;
@@ -114,7 +123,7 @@ const columns: DataTableColumns<Library> = [
       });
     },
   },
-  { title: "类型", key: "media_type", width: 70 },
+
   {
     title: "最近扫描", key: "last_scan_at", width: 110,
     render(row) {
@@ -165,13 +174,7 @@ onMounted(load);
       <n-form-item label="strm 输出路径 *" :feedback="'容器内的路径, 例 /media/电影'">
         <n-input v-model:value="form.target_strm_path" placeholder="/media/电影" />
       </n-form-item>
-      <n-form-item label="类型">
-        <n-select v-model:value="form.media_type" :options="[
-          { label: '电影', value: 'movie' },
-          { label: '剧集', value: 'tv' },
-          { label: '混合', value: 'mixed' },
-        ]" />
-      </n-form-item>
+
       <n-form-item label="strm 模式 *" :feedback="'cd2_local 写本地路径, webdav 写 URL'">
         <n-select v-model:value="form.strm_mode" :options="[
           { label: 'CD2 本地路径', value: 'cd2_local' },
@@ -179,7 +182,16 @@ onMounted(load);
         ]" />
       </n-form-item>
       <n-form-item v-if="!isWebdav" label="CD2 路径前缀 *" :feedback="'写进 .strm 的前缀, Emby 通过此回源'">
-        <n-input v-model:value="form.cd2_mount_prefix" placeholder="/CloudNAS/115/电影" />
+        <n-space vertical :size="8" style="width: 100%;">
+          <n-checkbox v-model:checked="form.same_as_source">
+            跟扫描源相同（Emby 跟 fystrm 看到同一个 /mnt 挂载）
+          </n-checkbox>
+          <n-input
+            v-model:value="form.cd2_mount_prefix"
+            placeholder="/CloudNAS/115/电影"
+            :disabled="form.same_as_source"
+          />
+        </n-space>
       </n-form-item>
       <n-form-item v-if="isWebdav" label="WebDAV Base URL *" :feedback="'CD2 暴露的 WebDAV 服务地址'">
         <n-input v-model:value="form.webdav_base_url" placeholder="http://cd2:19798/dav" />
