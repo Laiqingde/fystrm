@@ -32,6 +32,8 @@ class Settings(BaseSettings):
 
     # CD2 Webhook
     cd2_webhook_token: str = ""
+    # CD2 在 fystrm 容器内的 FUSE 挂载根, webhook 收到的网盘相对路径会自动拼上此前缀
+    cd2_mount_root: str = "/mnt/CloudNAS"
 
     # Logging
     log_level: str = "INFO"

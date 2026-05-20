@@ -31,10 +31,36 @@ from fystrm.plugins.strm_path.cd2_local import CD2LocalStrmPathPlugin
 from fystrm.plugins.strm_path.webdav import WebDAVStrmPathPlugin
 
 
+def _normalize_cd2_path(path: str) -> str:
+    """把 CD2 推过来的网盘相对路径转换成 fystrm 容器内的 FUSE 挂载路径.
+
+    CD2 通常推: /WebDAV/me/media/电影/华语电影/foo.mkv  (网盘根下)
+    fystrm 看: /mnt/CloudNAS/WebDAV/me/media/电影/华语电影/foo.mkv
+
+    转换规则: 如果 path 不以 cd2_mount_root 开头, 自动拼接前缀.
+    """
+    from fystrm.config import settings
+    root = (settings.cd2_mount_root or "").rstrip("/")
+    if not root or not path:
+        return path
+    if path.startswith(root + "/") or path == root:
+        return path
+    if not path.startswith("/"):
+        path = "/" + path
+    return root + path
+
+
 async def handle_file_event(
     ctx: dict, *, action: str, source_file: str, destination_file: str | None = None
 ) -> dict[str, Any]:
     """webhook 入队任务."""
+    # 路径映射: CD2 给的网盘相对路径 -> fystrm 容器内的 FUSE 挂载路径
+    src_orig = source_file
+    source_file = _normalize_cd2_path(source_file)
+    if destination_file:
+        destination_file = _normalize_cd2_path(destination_file)
+    if src_orig != source_file:
+        logger.info("path mapped: {!r} -> {!r}", src_orig, source_file)
     logger.info("file webhook action={} src={!r} dst={!r}", action, source_file, destination_file)
 
     if action == "create":

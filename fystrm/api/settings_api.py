@@ -18,4 +18,5 @@ async def get_settings() -> dict:
         "debug": settings.debug,
         "cd2_webhook_configured": bool(settings.cd2_webhook_token),
         "cd2_webhook_token": settings.cd2_webhook_token or "",
+        "cd2_mount_root": settings.cd2_mount_root,
     }
