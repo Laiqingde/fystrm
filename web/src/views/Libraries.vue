@@ -8,8 +8,9 @@ import type { DataTableColumns } from "naive-ui";
 import {
   AddOutline, PlayOutline, TrashOutline, FolderOpenOutline, CloudOutline,
   TvOutline, FilmOutline, AlbumsOutline, EllipseSharp,
+  CreateOutline, SaveOutline,
 } from "@vicons/ionicons5";
-import { listLibraries, createLibrary, deleteLibrary, startScan, type Library } from "../api";
+import { listLibraries, createLibrary, updateLibrary, deleteLibrary, startScan, type Library } from "../api";
 
 const message = useMessage();
 const libs = ref<Library[]>([]);
@@ -25,6 +26,8 @@ const defaultForm = () => ({
   scrape_enabled: true,
   same_as_source: true,
 });
+const editingLib = ref<Library | null>(null);
+const isEditing = computed(() => editingLib.value !== null);
 const form = ref(defaultForm());
 
 // 联动: same_as_source 勾选时 cd2_mount_prefix 跟随 source_path
@@ -53,14 +56,49 @@ async function submit() {
     payload.webdav_path_prefix = null;
   }
   try {
-    await createLibrary(payload);
-    message.success("创建成功");
+    if (editingLib.value) {
+      await updateLibrary(editingLib.value.id, payload);
+      message.success("已保存");
+    } else {
+      await createLibrary(payload);
+      message.success("创建成功");
+    }
     showCreate.value = false;
-    form.value = defaultForm();
+    resetModal();
     await load();
   } catch (e: any) {
-    message.error("创建失败: " + (e?.response?.data?.detail || e.message));
+    message.error((editingLib.value ? "保存" : "创建") + "失败: " + (e?.response?.data?.detail || e.message));
   }
+}
+
+function onEdit(lib: Library) {
+  editingLib.value = lib;
+  form.value = {
+    name: lib.name,
+    source_path: lib.source_path,
+    target_strm_path: lib.target_strm_path,
+    cd2_mount_prefix: lib.cd2_mount_prefix,
+    media_type: lib.media_type,
+    enabled: lib.enabled,
+    strm_mode: lib.strm_mode,
+    webdav_base_url: lib.webdav_base_url || "",
+    webdav_path_prefix: lib.webdav_path_prefix || "",
+    strm_extensions: lib.strm_extensions,
+    metadata_extensions: lib.metadata_extensions,
+    scrape_enabled: lib.scrape_enabled,
+    same_as_source: lib.source_path === lib.cd2_mount_prefix,
+  };
+  showCreate.value = true;
+}
+
+function resetModal() {
+  editingLib.value = null;
+  form.value = defaultForm();
+}
+
+function onModalClose(v: boolean) {
+  showCreate.value = v;
+  if (!v) resetModal();
 }
 
 async function onScan(lib: Library) {
@@ -143,12 +181,15 @@ const columns: DataTableColumns<Library> = [
     },
   },
   {
-    title: "操作", key: "actions", width: 200,
+    title: "操作", key: "actions", width: 220,
     render(row) {
       return h(NSpace, { size: 6 }, () => [
         h(NButton, { size: "small", type: "primary", onClick: () => onScan(row) }, {
           icon: () => h(NIcon, { component: PlayOutline }),
           default: () => "扫描",
+        }),
+        h(NButton, { size: "small", quaternary: true, onClick: () => onEdit(row) }, {
+          icon: () => h(NIcon, { component: CreateOutline }),
         }),
         h(NPopconfirm, { onPositiveClick: () => onDelete(row) }, {
           default: () => "确认删除?",
@@ -175,7 +216,7 @@ onMounted(load);
     <n-data-table :columns="columns" :data="libs" :loading="loading" :bordered="false" />
   </n-card>
 
-  <n-modal v-model:show="showCreate" preset="card" title="新建媒体库" style="width: 640px;">
+  <n-modal :show="showCreate" preset="card" :title="isEditing ? '编辑媒体库 — ' + editingLib?.name : '新建媒体库'" style="width: 640px;" @update:show="onModalClose">
     <n-form label-placement="top">
       <n-form-item label="名称 *">
         <n-input v-model:value="form.name" placeholder="例: 我的电影库" />
@@ -234,7 +275,10 @@ onMounted(load);
           placeholder=".nfo;.jpg;.png"
         />
       </n-form-item>
-      <n-button type="primary" @click="submit" block size="large">创建</n-button>
+      <n-button type="primary" @click="submit" block size="large">
+        <template #icon><n-icon :component="isEditing ? SaveOutline : AddOutline" /></template>
+        {{ isEditing ? "保存" : "创建" }}
+      </n-button>
     </n-form>
   </n-modal>
 </template>
