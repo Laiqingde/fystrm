@@ -62,13 +62,16 @@ async def generate_movie_strm(
 ) -> StrmArtifacts:
     out_dir = movie_root_dir(target_root, meta)
     out_dir.mkdir(parents=True, exist_ok=True)
-    base = sanitize_dirname(meta.title)
+    # 文件名跟源 stem 一致 (例 "焚城 (2024) - 1080p"), 保留 release tag, 跟 Emby 标准兼容
+    from pathlib import PurePosixPath as _PPP
+    base = _PPP(strm_ctx.source_path).stem
 
     strm_content = strm_path_plugin.render(strm_ctx)
     strm_path = out_dir / f"{base}.strm"
     strm_path.write_text(strm_content, encoding="utf-8")
     logger.info("movie strm -> {}", strm_path)
 
+    # nfo 仍叫 movie.nfo (Emby 单文件夹一部电影场景的标准命名), 不跟随源 stem
     nfo_path = out_dir / "movie.nfo"
     nfo_path.write_text(build_movie_nfo(meta), encoding="utf-8")
 
@@ -112,8 +115,9 @@ async def generate_episode_strm(
     season_dir = show_dir / f"Season {season:02d}"
     season_dir.mkdir(parents=True, exist_ok=True)
 
-    show_base = sanitize_dirname(tv_meta.title)
-    ep_base = f"{show_base} - S{season:02d}E{episode:02d}"
+    # 文件名跟源 stem 一致 (例 "Breaking.Bad.S01E01.1080p.BluRay.x264")
+    from pathlib import PurePosixPath as _PPP
+    ep_base = _PPP(strm_ctx.source_path).stem
 
     # strm
     strm_content = strm_path_plugin.render(strm_ctx)
@@ -121,7 +125,7 @@ async def generate_episode_strm(
     strm_path.write_text(strm_content, encoding="utf-8")
     logger.info("episode strm -> {}", strm_path)
 
-    # nfo
+    # nfo (Emby 单集 nfo 命名跟源 stem 一致即可)
     nfo_path = season_dir / f"{ep_base}.nfo"
     nfo_path.write_text(build_episode_nfo(episode_meta, parent_meta=tv_meta), encoding="utf-8")
 
