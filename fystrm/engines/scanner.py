@@ -28,14 +28,30 @@ class ScannedFile:
     sidecar_subtitles: tuple = field(default_factory=tuple)  # tuple[Subtitle, ...]
 
 
-def is_video(name: str) -> bool:
-    return PurePosixPath(name).suffix.lower() in VIDEO_EXTENSIONS
+def is_video(name: str, extensions: frozenset[str] | None = None) -> bool:
+    return PurePosixPath(name).suffix.lower() in (extensions or VIDEO_EXTENSIONS)
+
+
+def parse_extensions(s: str) -> frozenset[str]:
+    """解析分号/逗号分隔的扩展名字符串, 统一小写带点."""
+    if not s:
+        return frozenset()
+    out = set()
+    for tok in s.replace(",", ";").split(";"):
+        tok = tok.strip().lower()
+        if not tok:
+            continue
+        if not tok.startswith("."):
+            tok = "." + tok
+        out.add(tok)
+    return frozenset(out)
 
 
 async def scan_directory(
     drive: DrivePlugin,
     root: str,
     *,
+    video_extensions: frozenset[str] | None = None,
     min_size: int = MIN_VIDEO_SIZE,
     follow_dirs: bool = True,
     detect_subtitles: bool = True,
@@ -56,7 +72,7 @@ async def scan_directory(
                 if follow_dirs:
                     stack.append(entry.path)
                 continue
-            if not is_video(entry.name):
+            if not is_video(entry.name, video_extensions):
                 continue
             if entry.size < min_size:
                 logger.debug("skip small file: {} ({} bytes)", entry.path, entry.size)

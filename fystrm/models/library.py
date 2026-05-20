@@ -26,3 +26,12 @@ class Library(Base, TimestampMixin):
     strm_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="cd2_local")  # cd2_local | webdav
     webdav_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     webdav_path_prefix: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # v0.3: 自定义文件后缀 (分号分隔, 小写带点)
+    strm_extensions: Mapped[str] = mapped_column(
+        String(1024), nullable=False,
+        default=".mp4;.mkv;.ts;.iso;.rmvb;.avi;.mov;.mpeg;.mpg;.wmv;.3gp;.asf;.m4v;.flv;.m2ts;.tp;.f4v",
+    )
+    metadata_extensions: Mapped[str] = mapped_column(
+        String(1024), nullable=False, default="",
+    )

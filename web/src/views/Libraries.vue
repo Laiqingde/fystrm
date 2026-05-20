@@ -20,6 +20,8 @@ const defaultForm = () => ({
   name: "", source_path: "", target_strm_path: "", cd2_mount_prefix: "",
   media_type: "mixed", enabled: true,
   strm_mode: "cd2_local", webdav_base_url: "", webdav_path_prefix: "",
+  strm_extensions: ".mp4;.mkv;.ts;.iso;.rmvb;.avi;.mov;.mpeg;.mpg;.wmv;.3gp;.asf;.m4v;.flv;.m2ts;.tp;.f4v",
+  metadata_extensions: ".nfo;.jpg;.png",
   same_as_source: true,
 });
 const form = ref(defaultForm());
@@ -198,6 +200,22 @@ onMounted(load);
       </n-form-item>
       <n-form-item v-if="isWebdav" label="WebDAV 路径前缀" :feedback="'例 /115/电影'">
         <n-input v-model:value="form.webdav_path_prefix" placeholder="/115/电影" />
+      </n-form-item>
+      <n-form-item label="strm 后缀" :feedback="'分号分隔, 指定后缀的文件会生成 .strm. 例: .mp4;.mkv;.ts'">
+        <n-input
+          v-model:value="form.strm_extensions"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 4 }"
+          placeholder=".mp4;.mkv;.ts"
+        />
+      </n-form-item>
+      <n-form-item label="元数据后缀" :feedback="'分号分隔, 命中后缀的文件原样镜像到 strm 输出目录, 留空跳过. 例: .nfo;.jpg;.png'">
+        <n-input
+          v-model:value="form.metadata_extensions"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 4 }"
+          placeholder=".nfo;.jpg;.png"
+        />
       </n-form-item>
       <n-button type="primary" @click="submit" block size="large">创建</n-button>
     </n-form>

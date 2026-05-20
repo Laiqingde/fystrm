@@ -15,6 +15,8 @@ export interface Library {
   strm_mode: string;
   webdav_base_url: string | null;
   webdav_path_prefix: string | null;
+  strm_extensions: string;
+  metadata_extensions: string;
 }
 
 export interface ScanTask {

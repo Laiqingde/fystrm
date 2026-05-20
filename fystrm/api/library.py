@@ -24,6 +24,10 @@ class LibraryIn(BaseModel):
     strm_mode: str = Field("cd2_local", pattern="^(cd2_local|webdav)$")
     webdav_base_url: str | None = None
     webdav_path_prefix: str | None = None
+    strm_extensions: str = Field(
+        default=".mp4;.mkv;.ts;.iso;.rmvb;.avi;.mov;.mpeg;.mpg;.wmv;.3gp;.asf;.m4v;.flv;.m2ts;.tp;.f4v"
+    )
+    metadata_extensions: str = Field(default="")
 
 
 class LibraryOut(LibraryIn):
@@ -89,6 +93,8 @@ def _serialize(lib: Library) -> dict:
         "strm_mode": lib.strm_mode,
         "webdav_base_url": lib.webdav_base_url,
         "webdav_path_prefix": lib.webdav_path_prefix,
+        "strm_extensions": lib.strm_extensions,
+        "metadata_extensions": lib.metadata_extensions,
         "last_scan_at": lib.last_scan_at,
         "created_at": lib.created_at,
         "updated_at": lib.updated_at,

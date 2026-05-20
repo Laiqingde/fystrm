@@ -13,7 +13,8 @@ from fystrm.core.ws_hub import publish
 from fystrm.db import SessionLocal
 from fystrm.engines.emby import refresh_library
 from fystrm.engines.identifier import identify
-from fystrm.engines.scanner import scan_directory
+from fystrm.engines.metadata_sync import sync_metadata
+from fystrm.engines.scanner import parse_extensions, scan_directory
 from fystrm.engines.scraper import scrape_episode, scrape_movie, scrape_tv
 from fystrm.engines.strm import generate_episode_strm, generate_movie_strm
 from fystrm.engines.subtitle import copy_subtitles
@@ -69,9 +70,16 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
     target_root = Path(lib.target_strm_path)
     target_root.mkdir(parents=True, exist_ok=True)
 
+    video_exts = parse_extensions(lib.strm_extensions) or None
     files = []
-    async for sf in scan_directory(drive, lib.source_path):
+    async for sf in scan_directory(drive, lib.source_path, video_extensions=video_exts):
         files.append(sf)
+
+    # 同步元数据 (nfo/jpg/png 等) 到 strm 输出目录
+    metadata_exts = parse_extensions(lib.metadata_extensions)
+    metadata_copied = sync_metadata(lib.source_path, lib.target_strm_path, metadata_exts) if metadata_exts else []
+    if metadata_copied:
+        logger.info("metadata 同步 {} 个文件", len(metadata_copied))
 
     total = len(files)
     async with SessionLocal() as db:
