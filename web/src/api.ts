@@ -62,6 +62,8 @@ export interface Settings {
   emby_url: string | null;
   log_level: string;
   debug: boolean;
+  cd2_webhook_configured: boolean;
+  cd2_webhook_token: string;
 }
 
 export const listLibraries = () => api.get<Library[]>("/api/libraries/").then(r => r.data);

@@ -16,4 +16,6 @@ async def get_settings() -> dict:
         "emby_url": settings.emby_url or None,
         "log_level": settings.log_level,
         "debug": settings.debug,
+        "cd2_webhook_configured": bool(settings.cd2_webhook_token),
+        "cd2_webhook_token": settings.cd2_webhook_token or "",
     }
