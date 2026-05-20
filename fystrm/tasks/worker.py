@@ -4,6 +4,7 @@ from loguru import logger
 from fystrm.config import settings
 from fystrm.core.logger import setup_logging
 from fystrm.tasks.scan import scan_library_task
+from fystrm.tasks.webhook import handle_file_event
 
 
 async def ping(ctx: dict) -> str:
@@ -26,7 +27,7 @@ class WorkerSettings:
         port=settings.redis_port,
         database=settings.redis_db,
     )
-    functions = [ping, scan_library_task]
+    functions = [ping, scan_library_task, handle_file_event]
     on_startup = startup
     on_shutdown = shutdown
     job_timeout = 1800  # 30min, 大目录扫描留时间

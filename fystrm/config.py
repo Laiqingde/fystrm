@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     emby_url: str = ""
     emby_api_key: str = ""
 
+    # CD2 Webhook
+    cd2_webhook_token: str = ""
+
     # Logging
     log_level: str = "INFO"
 
