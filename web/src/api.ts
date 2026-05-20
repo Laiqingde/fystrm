@@ -17,6 +17,7 @@ export interface Library {
   webdav_path_prefix: string | null;
   strm_extensions: string;
   metadata_extensions: string;
+  scrape_enabled: boolean;
 }
 
 export interface ScanTask {

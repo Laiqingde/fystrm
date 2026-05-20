@@ -109,7 +109,7 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
                 tvshow_lock=tvshow_lock,
                 tv_meta_cache=tv_meta_cache,
             )
-            if outcome == "done":
+            if outcome in ("done", "no_scrape"):
                 success += 1; event = "file_done"
             elif outcome == "skipped":
                 skipped += 1; event = "file_skipped"
@@ -159,7 +159,11 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
 
 
 async def _process_one(*, lib, sf, meta_plugin, strm_plugin, target_root, tvshow_lock, tv_meta_cache) -> str:
-    """Returns: "done" | "skipped" | "failed"."""
+    """Returns: "done" | "skipped" | "failed" | "no_scrape"."""
+    # 刮削开关关闭 -> 只生成 strm, 不调 TMDB, 不写 movie.nfo, 不下载海报
+    if not lib.scrape_enabled:
+        return await _process_no_scrape(lib, sf, strm_plugin, target_root)
+
     info = identify(sf.drive_file.name)
 
     if info.media_type == "movie":
@@ -284,6 +288,53 @@ async def _process_episode(lib, sf, info, meta_plugin, strm_plugin, target_root,
         scrape_status="done", scrape_error=None,
     )
     return "done"
+
+
+async def _process_no_scrape(lib, sf, strm_plugin, target_root) -> str:
+    """关闭刮削模式: 按源目录镜像生成 strm, 文件名跟随源 stem.
+
+    target/<rel_dir>/<source_stem>.strm
+    不调 TMDB, 不生 movie.nfo, 不下载 poster/fanart.
+    源 nfo/jpg/png 通过 metadata_sync 已经镜像 (调 task 主流程那里).
+    """
+    from pathlib import PurePosixPath
+    from fystrm.engines.strm import sanitize_dirname
+    from fystrm.plugins.strm_path.base import StrmContext
+
+    src = PurePosixPath(sf.drive_file.path)
+    root = PurePosixPath(lib.source_path)
+    try:
+        rel = src.relative_to(root)
+    except ValueError:
+        rel = PurePosixPath(src.name)
+    rel_dir = rel.parent
+    stem = src.stem
+
+    out_dir = Path(lib.target_strm_path) / str(rel_dir) if str(rel_dir) and str(rel_dir) != "." else Path(lib.target_strm_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    strm_path = out_dir / f"{stem}.strm"
+
+    ctx = StrmContext(
+        source_path=sf.drive_file.path,
+        source_root=lib.source_path,
+        cd2_mount_prefix=lib.cd2_mount_prefix or "",
+        webdav_base_url=lib.webdav_base_url,
+        webdav_path_prefix=lib.webdav_path_prefix,
+    )
+    strm_content = strm_plugin.render(ctx)
+    strm_path.write_text(strm_content, encoding="utf-8")
+    logger.info("no-scrape strm -> {}", strm_path)
+
+    # MediaItem 仅记最小信息
+    await _upsert(
+        source_file_path=sf.drive_file.path, library_id=lib.id,
+        title=stem,
+        source_file_size=sf.drive_file.size,
+        strm_path=str(strm_path),
+        media_type="unknown",
+        scrape_status="no_scrape", scrape_error=None,
+    )
+    return "no_scrape"
 
 
 async def _upsert(*, source_file_path: str, **fields) -> None:

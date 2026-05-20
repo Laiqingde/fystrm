@@ -2,7 +2,7 @@
 import { onMounted, ref, h, computed, watch } from "vue";
 import {
   NCard, NDataTable, NButton, NSpace, NModal, NForm, NFormItem, NInput, NSelect,
-  NTag, NPopconfirm, NIcon, NTooltip, NCheckbox, useMessage,
+  NTag, NPopconfirm, NIcon, NTooltip, NCheckbox, NSwitch, useMessage,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import {
@@ -22,6 +22,7 @@ const defaultForm = () => ({
   strm_mode: "cd2_local", webdav_base_url: "", webdav_path_prefix: "",
   strm_extensions: ".mp4;.mkv;.ts;.iso;.rmvb;.avi;.mov;.mpeg;.mpg;.wmv;.3gp;.asf;.m4v;.flv;.m2ts;.tp;.f4v",
   metadata_extensions: ".nfo;.jpg;.png",
+  scrape_enabled: true,
   same_as_source: true,
 });
 const form = ref(defaultForm());
@@ -125,6 +126,15 @@ const columns: DataTableColumns<Library> = [
       });
     },
   },
+  {
+    title: "刮削", key: "scrape_enabled", width: 70,
+    render(row) {
+      return h(NTag, {
+        size: "small", round: true,
+        type: row.scrape_enabled ? "success" : "default",
+      }, { default: () => row.scrape_enabled ? "开" : "关" });
+    },
+  },
 
   {
     title: "最近扫描", key: "last_scan_at", width: 110,
@@ -201,6 +211,13 @@ onMounted(load);
       <n-form-item v-if="isWebdav" label="WebDAV 路径前缀" :feedback="'例 /115/电影'">
         <n-input v-model:value="form.webdav_path_prefix" placeholder="/115/电影" />
       </n-form-item>
+      <n-form-item label="刮削" :feedback="form.scrape_enabled ? '调 TMDB 刮削, 生成 fystrm 自己的 movie.nfo + 海报' : '只生成 strm + 镜像源元数据, 不调 TMDB. 源没 nfo 就什么也没有'">
+        <n-switch v-model:value="form.scrape_enabled">
+          <template #checked>开启</template>
+          <template #unchecked>关闭</template>
+        </n-switch>
+      </n-form-item>
+
       <n-form-item label="strm 后缀" :feedback="'分号分隔, 指定后缀的文件会生成 .strm. 例: .mp4;.mkv;.ts'">
         <n-input
           v-model:value="form.strm_extensions"

@@ -35,3 +35,6 @@ class Library(Base, TimestampMixin):
     metadata_extensions: Mapped[str] = mapped_column(
         String(1024), nullable=False, default="",
     )
+
+    # v0.3: 刮削开关 (False = 只生成 strm + 同步源元数据, 不调 TMDB / 不生 movie.nfo / 不下载海报)
+    scrape_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

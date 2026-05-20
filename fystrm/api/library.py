@@ -28,6 +28,7 @@ class LibraryIn(BaseModel):
         default=".mp4;.mkv;.ts;.iso;.rmvb;.avi;.mov;.mpeg;.mpg;.wmv;.3gp;.asf;.m4v;.flv;.m2ts;.tp;.f4v"
     )
     metadata_extensions: str = Field(default="")
+    scrape_enabled: bool = True
 
 
 class LibraryOut(LibraryIn):
@@ -95,6 +96,7 @@ def _serialize(lib: Library) -> dict:
         "webdav_path_prefix": lib.webdav_path_prefix,
         "strm_extensions": lib.strm_extensions,
         "metadata_extensions": lib.metadata_extensions,
+        "scrape_enabled": lib.scrape_enabled,
         "last_scan_at": lib.last_scan_at,
         "created_at": lib.created_at,
         "updated_at": lib.updated_at,
