@@ -12,3 +12,6 @@ def setup_logging() -> None:
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level:<7}</level> | <cyan>{name}:{function}:{line}</cyan> - <level>{message}</level>",
         colorize=True,
     )
+    # Redis sink: UI 实时日志
+    from fystrm.core.log_stream import setup_log_stream
+    setup_log_stream()

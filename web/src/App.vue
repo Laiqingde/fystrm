@@ -7,6 +7,7 @@ import {
 } from "naive-ui";
 import {
   GridOutline, FilmOutline, FolderOpenOutline, TimeOutline, SettingsOutline,
+  TerminalOutline,
   SunnyOutline, MoonOutline, EllipsisHorizontalOutline,
 } from "@vicons/ionicons5";
 import { naiveTheme, themeOverrides, themeMode, setThemeMode, isDark, type ThemeMode } from "./theme";
@@ -19,6 +20,7 @@ const menu = [
   { key: "/libraries", label: "媒体库", icon: FolderOpenOutline },
   { key: "/media", label: "媒体", icon: FilmOutline },
   { key: "/tasks", label: "任务", icon: TimeOutline },
+  { key: "/logs", label: "日志", icon: TerminalOutline },
   { key: "/settings", label: "设置", icon: SettingsOutline },
 ];
 

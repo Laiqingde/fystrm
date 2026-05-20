@@ -8,6 +8,7 @@ export const router = createRouter({
     { path: "/libraries", component: () => import("./views/Libraries.vue") },
     { path: "/tasks", component: () => import("./views/TaskList.vue") },
     { path: "/media", component: () => import("./views/MediaList.vue") },
+    { path: "/logs", component: () => import("./views/Logs.vue") },
     { path: "/settings", component: () => import("./views/Settings.vue") },
   ],
 });
