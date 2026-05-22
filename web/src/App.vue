@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref } from "vue";
+import { computed, h, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import {
   NConfigProvider, NMessageProvider, NLayout, NLayoutHeader, NLayoutContent,
@@ -8,12 +8,38 @@ import {
 import {
   GridOutline, FilmOutline, FolderOpenOutline, TimeOutline, SettingsOutline,
   TerminalOutline,
+  PersonCircleOutline, LogOutOutline,
   SunnyOutline, MoonOutline, EllipsisHorizontalOutline,
 } from "@vicons/ionicons5";
 import { naiveTheme, themeOverrides, themeMode, setThemeMode, isDark, type ThemeMode } from "./theme";
+import { clearToken, getStoredUser } from "./api";
 
 const route = useRoute();
 const router = useRouter();
+
+const currentUser = ref(getStoredUser());
+const isLoginPage = computed(() => route.path === "/login");
+
+function onLogout() {
+  clearToken();
+  currentUser.value = null;
+  router.push("/login");
+}
+
+// 路由变化时刷新用户 (登录后 redirect 不会重 mount)
+watch(() => route.path, () => {
+  currentUser.value = getStoredUser();
+});
+
+const userMenuOptions = computed(() => [
+  { label: currentUser.value?.username || "未登录", key: "_info", disabled: true },
+  { type: "divider", key: "d1" },
+  { label: "退出登录", key: "logout", icon: () => h(NIcon, { component: LogOutOutline }) },
+]);
+
+function onUserMenu(key: string) {
+  if (key === "logout") onLogout();
+}
 
 const menu = [
   { key: "/dashboard", label: "仪表盘", icon: GridOutline },
@@ -43,7 +69,7 @@ function onTheme(key: string) {
   <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
     <n-message-provider>
       <n-layout style="min-height: 100vh;">
-        <n-layout-header bordered class="fystrm-header">
+        <n-layout-header v-if="!isLoginPage" bordered class="fystrm-header">
           <div class="fystrm-header-inner">
             <div class="fystrm-brand">
               <span class="fystrm-logo">🎬</span>
@@ -67,6 +93,13 @@ function onTheme(key: string) {
                 <n-button quaternary circle :aria-label="'主题: ' + themeMode">
                   <template #icon>
                     <n-icon :component="isDark ? MoonOutline : SunnyOutline" :size="18" />
+                  </template>
+                </n-button>
+              </n-dropdown>
+              <n-dropdown v-if="currentUser" trigger="click" :options="userMenuOptions" @select="onUserMenu">
+                <n-button quaternary circle>
+                  <template #icon>
+                    <n-icon :component="PersonCircleOutline" :size="20" />
                   </template>
                 </n-button>
               </n-dropdown>

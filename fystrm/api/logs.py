@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Query, WebSocket
 from loguru import logger
 
+from fystrm.core.auth import decode_token
 from fystrm.core.log_stream import LOG_CHANNEL, LOG_HISTORY_KEY
 from fystrm.utils.cache import get_redis
 
@@ -30,8 +31,11 @@ async def recent_logs(limit: int = Query(200, ge=1, le=500)) -> list[dict]:
 
 
 @router.websocket("/ws/logs")
-async def ws_logs(ws: WebSocket) -> None:
-    """订阅实时日志 (pub/sub)."""
+async def ws_logs(ws: WebSocket, token: str = "") -> None:
+    """订阅实时日志 (pub/sub). token 从 query string 传."""
+    if not token or decode_token(token) is None:
+        await ws.close(code=4401, reason="unauthorized")
+        return
     await ws.accept()
     r = get_redis()
     pubsub = r.pubsub()

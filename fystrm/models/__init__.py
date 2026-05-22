@@ -3,6 +3,7 @@ from fystrm.models.drive_account import DriveAccount
 from fystrm.models.library import Library
 from fystrm.models.media import MediaItem
 from fystrm.models.task import ScanTask, TransferTask
+from fystrm.models.user import User
 from fystrm.models.webhook_event import WebhookEvent
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "TransferTask",
     "DriveAccount",
     "WebhookEvent",
+    "User",
 ]

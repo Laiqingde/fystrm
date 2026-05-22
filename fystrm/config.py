@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     emby_url: str = ""
     emby_api_key: str = ""
 
+    # Auth
+    admin_username: str = "admin"
+    admin_password: str = ""  # 空 = 首启随机生成并打到日志
+    jwt_secret: str = ""       # 空 = 用 secret_key
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24 * 7  # 7 天
+
     # CD2 Webhook
     cd2_webhook_token: str = ""
     # CD2 在 fystrm 容器内的 FUSE 挂载根, webhook 收到的网盘相对路径会自动拼上此前缀

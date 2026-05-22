@@ -97,3 +97,51 @@ export interface DashboardStats {
 }
 
 export const getDashboardStats = () => api.get<DashboardStats>("/api/dashboard/stats").then(r => r.data);
+
+// ===== Auth =====
+const TOKEN_KEY = "fystrm-token";
+const USER_KEY = "fystrm-user";
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  is_admin: boolean;
+}
+
+export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
+export function setToken(t: string) { localStorage.setItem(TOKEN_KEY, t); }
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+export function getStoredUser(): AuthUser | null {
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+export function setStoredUser(u: AuthUser) { localStorage.setItem(USER_KEY, JSON.stringify(u)); }
+
+// 拦截器: 自动加 token + 401 跳登录
+api.interceptors.request.use((cfg) => {
+  const t = getToken();
+  if (t && cfg.headers) cfg.headers.Authorization = `Bearer ${t}`;
+  return cfg;
+});
+
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    if (err?.response?.status === 401 && location.hash !== "#/login") {
+      clearToken();
+      location.hash = "#/login";
+    }
+    return Promise.reject(err);
+  },
+);
+
+export const login = (username: string, password: string) =>
+  api.post<{ access_token: string; token_type: string; user: AuthUser }>(
+    "/api/auth/login", { username, password }
+  ).then(r => r.data);
+
+export const fetchMe = () => api.get<AuthUser>("/api/auth/me").then(r => r.data);

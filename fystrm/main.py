@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from fystrm.api import api_router
+from fystrm.core.admin_bootstrap import ensure_admin
 from fystrm.config import settings
 from fystrm.core.logger import setup_logging
 from fystrm.core.queue import close_arq_pool
@@ -18,6 +19,19 @@ WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("fystrm starting | debug={} | port={} | web_dist={}", settings.debug, settings.port, WEB_DIST.exists())
+    # 启动自动 alembic upgrade
+    try:
+        from alembic.config import Config
+        from alembic import command
+        import asyncio as _aio
+        def _migrate():
+            cfg = Config("alembic.ini")
+            command.upgrade(cfg, "head")
+        await _aio.to_thread(_migrate)
+        logger.info("alembic upgrade head 完成")
+    except Exception as e:
+        logger.error("alembic upgrade 失败: {}", e)
+    await ensure_admin()
     yield
     await close_arq_pool()
     logger.info("fystrm shutting down")
