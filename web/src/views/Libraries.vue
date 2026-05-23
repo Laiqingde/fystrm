@@ -29,6 +29,34 @@ const defaultForm = () => ({
 const editingLib = ref<Library | null>(null);
 const isEditing = computed(() => editingLib.value !== null);
 const form = ref(defaultForm());
+const cloneFromId = ref<number | null>(null);
+
+const cloneOptions = computed(() => libs.value.map(l => ({
+  label: `${l.name}  (#${l.id} · ${l.source_path})`,
+  value: l.id,
+})));
+
+function copyFromLib(libId: number | null) {
+  if (libId == null) return;
+  const src = libs.value.find(l => l.id === libId);
+  if (!src) return;
+  form.value = {
+    name: "",  // 名字留空, 用户自己填
+    source_path: src.source_path,
+    target_strm_path: src.target_strm_path,
+    cd2_mount_prefix: src.cd2_mount_prefix,
+    media_type: src.media_type,
+    enabled: src.enabled,
+    strm_mode: src.strm_mode,
+    webdav_base_url: src.webdav_base_url || "",
+    webdav_path_prefix: src.webdav_path_prefix || "",
+    strm_extensions: src.strm_extensions,
+    metadata_extensions: src.metadata_extensions,
+    scrape_enabled: src.scrape_enabled,
+    same_as_source: src.source_path === src.cd2_mount_prefix,
+  };
+  message.success(`已从「${src.name}」复制配置, 修改名称后保存`);
+}
 
 // 联动: same_as_source 勾选时 cd2_mount_prefix 跟随 source_path
 watch(() => [form.value.source_path, form.value.same_as_source], () => {
@@ -94,6 +122,7 @@ function onEdit(lib: Library) {
 function resetModal() {
   editingLib.value = null;
   form.value = defaultForm();
+  cloneFromId.value = null;
 }
 
 function onModalClose(v: boolean) {
@@ -218,6 +247,15 @@ onMounted(load);
 
   <n-modal :show="showCreate" preset="card" :title="isEditing ? '编辑媒体库 — ' + editingLib?.name : '新建媒体库'" style="width: 640px;" @update:show="onModalClose">
     <n-form label-placement="top">
+      <n-form-item v-if="!isEditing && cloneOptions.length" label="复制现有配置" :feedback="'选择已有库, 自动填入除名称外所有字段'">
+        <n-select
+          v-model:value="cloneFromId"
+          :options="cloneOptions"
+          placeholder="(可选) 从已有库快速复制"
+          clearable
+          @update:value="copyFromLib"
+        />
+      </n-form-item>
       <n-form-item label="名称 *">
         <n-input v-model:value="form.name" placeholder="例: 我的电影库" />
       </n-form-item>
