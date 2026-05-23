@@ -76,9 +76,20 @@ const columns: DataTableColumns<ScanTask> = [
     },
   },
   {
-    title: "进度", key: "progress", width: 220,
+    title: "进度", key: "progress", width: 280,
     render(row) {
       const pct = row.total_files > 0 ? Math.round((row.processed_files / row.total_files) * 100) : 0;
+      // stage 文字优先 (discovering/syncing_metadata 时显示)
+      if (row.status === "running" && row.stage && row.stage !== "processing" && row.stage !== "done") {
+        return h("div", { style: "display: flex; flex-direction: column; gap: 4px;" }, [
+          h(NProgress, {
+            type: "line", percentage: pct, "indicator-placement": "inside",
+            height: 18, borderRadius: 9, status: "info",
+            processing: true,
+          }, { default: () => row.stage }),
+          h("div", { style: "font-size: 11px; opacity: 0.65;" }, row.stage_message || ""),
+        ]);
+      }
       return h(NProgress, {
         type: "line", percentage: pct, "indicator-placement": "inside",
         height: 18, borderRadius: 9, status: row.status === "failed" ? "error" : pct === 100 ? "success" : "info",

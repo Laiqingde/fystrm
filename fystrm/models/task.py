@@ -22,6 +22,9 @@ class ScanTask(Base, TimestampMixin):
     success_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # v0.3: 阶段细分 (pending/discovering/processing/syncing_metadata/done)
+    stage: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    stage_message: Mapped[str | None] = mapped_column(String(256), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

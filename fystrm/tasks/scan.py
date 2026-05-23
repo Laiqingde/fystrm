@@ -70,23 +70,21 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
     target_root = Path(lib.target_strm_path)
     target_root.mkdir(parents=True, exist_ok=True)
 
+    # === stage 1: discovering ===
+    await _update_stage(task_id, "discovering", "扫描视频文件中...")
     video_exts = parse_extensions(lib.strm_extensions) or None
     files = []
     async for sf in scan_directory(drive, lib.source_path, video_extensions=video_exts):
         files.append(sf)
+        if len(files) % 100 == 0:
+            await _update_stage(task_id, "discovering", f"已发现 {len(files)} 个视频...")
 
-    # 同步元数据 (nfo/jpg/png 等) 到 strm 输出目录
-    metadata_exts = parse_extensions(lib.metadata_extensions)
-    metadata_copied = sync_metadata(lib.source_path, lib.target_strm_path, metadata_exts) if metadata_exts else []
-    if metadata_copied:
-        logger.info("metadata 同步 {} 个文件", len(metadata_copied))
-
-    total = len(files)
     async with SessionLocal() as db:
         task = await db.get(ScanTask, task_id)
         task.total_files = total
         await db.commit()
     await publish(task_id, {"event": "discovered", "total": total})
+    await _update_stage(task_id, "processing", f"处理视频 0/{total}")
 
     # Per-task cache: 同剧集只写一次 tvshow.nfo
     tvshow_lock: set[str] = set()
@@ -136,12 +134,30 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
             "file": sf.rel_path, "error": error_msg,
         })
 
+    # === stage 3: syncing_metadata (后置, 已经把视频处理完用户看到 100%) ===
+    metadata_exts = parse_extensions(lib.metadata_extensions)
+    if metadata_exts:
+        await _update_stage(task_id, "syncing_metadata", "同步元数据中...")
+
+        def _progress(scanned, copied, skipped):
+            msg = f"同步元数据 {scanned} (copy {copied} / 跳过 {skipped})"
+            # 这是从同步函数回调, 不能 await, 用 asyncio.run_coroutine_threadsafe 或直接同步写
+            # 但 publish 是 async, 简化用 logger 输出, stage 通过外层定期更新
+            logger.info(msg)
+        result = sync_metadata(lib.source_path, lib.target_strm_path, metadata_exts, progress_cb=_progress)
+        await _update_stage(task_id, "syncing_metadata",
+                            f"元数据同步完成: copy {result["copied"]} / 跳过 {result["skipped"]} / 共 {result["total"]}")
+        logger.info("metadata 同步 copy={} skipped={} total={}",
+                    result["copied"], result["skipped"], result["total"])
+
     emby_ok = await refresh_library()
     await publish(task_id, {"event": "emby_refresh", "ok": emby_ok})
 
     async with SessionLocal() as db:
         task = await db.get(ScanTask, task_id)
         task.status = "done"
+        task.stage = "done"
+        task.stage_message = None
         task.finished_at = _now()
         await db.commit()
         lib_obj = await db.get(Library, lib.id)
@@ -351,6 +367,17 @@ async def _upsert(*, source_file_path: str, **fields) -> None:
             for k, v in fields.items():
                 setattr(item, k, v)
         await db.commit()
+
+
+async def _update_stage(task_id: int, stage: str, message: str | None = None) -> None:
+    """更新 ScanTask.stage + stage_message + WS 推 stage 事件."""
+    async with SessionLocal() as db:
+        t = await db.get(ScanTask, task_id)
+        if t:
+            t.stage = stage
+            t.stage_message = message
+            await db.commit()
+    await publish(task_id, {"event": "stage", "stage": stage, "message": message})
 
 
 def _now() -> datetime:

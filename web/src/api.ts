@@ -29,6 +29,8 @@ export interface ScanTask {
   success_count: number;
   failed_count: number;
   error: string | null;
+  stage: string;
+  stage_message: string | null;
   started_at: string | null;
   finished_at: string | null;
   created_at: string;

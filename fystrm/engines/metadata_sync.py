@@ -59,22 +59,47 @@ def walk_metadata(source_root: str, extensions: frozenset[str]) -> Iterator[Meta
         yield MetadataFile(src=p, rel_path=rel, ext=ext)
 
 
-def sync_metadata(source_root: str, target_root: str, extensions: frozenset[str]) -> list[str]:
-    """把 source_root 下命中后缀的文件镜像 copy 到 target_root. 返回 copy 后的路径列表."""
+def sync_metadata(
+    source_root: str, target_root: str, extensions: frozenset[str],
+    progress_cb=None,
+) -> dict:
+    """把 source_root 下命中后缀的文件镜像 copy. 返回 {copied, skipped, total}.
+
+    progress_cb(scanned, total_hint, copied, skipped): 每 50 文件回调一次,
+    用于 UI 推 stage_message.
+    """
     if not extensions:
-        return []
+        return {"copied": 0, "skipped": 0, "total": 0}
     target = Path(target_root)
-    out: list[str] = []
+    copied = 0
+    skipped = 0
+    scanned = 0
+    last_cb = 0
     for m in walk_metadata(source_root, extensions):
+        scanned += 1
         dest = target / m.rel_path
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
-            # 已存在且大小相同则跳过 (简单去重)
-            if dest.exists() and dest.stat().st_size == m.src.stat().st_size:
-                continue
-            shutil.copy2(m.src, dest)
-            out.append(str(dest))
-            logger.info("metadata copy {} -> {}", m.rel_path, dest)
+            # 已存在且 size>0 就跳过 (size>0 防之前失败留的空文件; 不强制 size 匹配避免 CD2 size 不准)
+            if dest.exists() and dest.stat().st_size > 0:
+                skipped += 1
+            else:
+                shutil.copy2(m.src, dest)
+                copied += 1
+                if copied <= 3 or copied % 200 == 0:
+                    logger.info("metadata copy {} -> {}", m.rel_path, dest)
         except Exception as e:
             logger.warning("metadata copy failed {} -> {}: {}", m.src, dest, e)
-    return out
+        # 进度回调每 50 文件触发一次
+        if progress_cb and scanned - last_cb >= 50:
+            last_cb = scanned
+            try:
+                progress_cb(scanned, copied, skipped)
+            except Exception:
+                pass
+    if progress_cb:
+        try:
+            progress_cb(scanned, copied, skipped)
+        except Exception:
+            pass
+    return {"copied": copied, "skipped": skipped, "total": scanned}

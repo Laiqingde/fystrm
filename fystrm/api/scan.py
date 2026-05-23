@@ -31,6 +31,8 @@ class ScanTaskOut(BaseModel):
     success_count: int
     failed_count: int
     error: Optional[str] = None
+    stage: str = "pending"
+    stage_message: Optional[str] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     created_at: datetime
@@ -82,6 +84,7 @@ def _serialize(t: ScanTask) -> dict:
         "id": t.id, "library_id": t.library_id, "status": t.status,
         "total_files": t.total_files, "processed_files": t.processed_files,
         "success_count": t.success_count, "failed_count": t.failed_count,
-        "error": t.error, "started_at": t.started_at, "finished_at": t.finished_at,
+        "error": t.error, "stage": t.stage, "stage_message": t.stage_message,
+        "started_at": t.started_at, "finished_at": t.finished_at,
         "created_at": t.created_at, "updated_at": t.updated_at,
     }
