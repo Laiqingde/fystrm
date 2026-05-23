@@ -11,6 +11,7 @@ import httpx
 from loguru import logger
 
 from fystrm.config import settings
+from fystrm.core import dynamic_settings
 from fystrm.plugins.meta.base import MediaMeta, MetaPlugin
 from fystrm.utils.cache import cache_get, cache_set, get_redis
 
@@ -26,8 +27,8 @@ class TMDBPlugin(MetaPlugin):
     source_name: ClassVar[str] = "tmdb"
 
     def __init__(self, api_key: str | None = None, language: str | None = None) -> None:
-        self.api_key = api_key or settings.tmdb_api_key
-        self.language = language or settings.tmdb_language
+        self.api_key = api_key or dynamic_settings.get("TMDB_API_KEY") or settings.tmdb_api_key
+        self.language = language or dynamic_settings.get("TMDB_LANGUAGE") or settings.tmdb_language
         if not self.api_key:
             logger.warning("TMDB_API_KEY 未配置，刮削会失败")
 

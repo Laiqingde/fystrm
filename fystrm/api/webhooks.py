@@ -14,6 +14,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from fystrm.config import settings
+from fystrm.core import dynamic_settings
 from fystrm.core.queue import get_arq_pool
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -21,14 +22,15 @@ router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 def verify_token(authorization: str | None = Header(default=None)) -> None:
     """校验 Bearer token == settings.cd2_webhook_token. 没配 token 则拒绝全部。"""
-    if not settings.cd2_webhook_token:
+    expected = dynamic_settings.get("CD2_WEBHOOK_TOKEN") or settings.cd2_webhook_token
+    if not expected:
         raise HTTPException(503, "CD2_WEBHOOK_TOKEN not configured")
     if not authorization:
         raise HTTPException(401, "missing Authorization header")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer":
         raise HTTPException(401, "expected Bearer scheme")
-    if not secrets.compare_digest(token.strip(), settings.cd2_webhook_token):
+    if not secrets.compare_digest(token.strip(), expected):
         raise HTTPException(403, "invalid token")
 
 

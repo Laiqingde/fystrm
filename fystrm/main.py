@@ -8,6 +8,7 @@ from loguru import logger
 
 from fystrm.api import api_router
 from fystrm.core.admin_bootstrap import ensure_admin
+from fystrm.core import dynamic_settings
 from fystrm.config import settings
 from fystrm.core.logger import setup_logging
 from fystrm.core.queue import close_arq_pool
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("alembic upgrade 失败: {}", e)
     await ensure_admin()
+    await dynamic_settings.seed_defaults()
+    await dynamic_settings.load_all()
     yield
     await close_arq_pool()
     logger.info("fystrm shutting down")

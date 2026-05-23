@@ -1,241 +1,287 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import {
-  NCard, NDescriptions, NDescriptionsItem, NTag, NAlert, NButton, NIcon, NInput,
-  NSpace, NSpin, NCode, useMessage,
+  NCard, NSpace, NButton, NIcon, NInput, NSelect, NTag, NDivider, NSwitch,
+  NAlert, NEmpty, NSpin, NModal, NForm, NFormItem, useMessage,
 } from "naive-ui";
 import {
-  RefreshOutline, InformationCircleOutline, CopyOutline, KeyOutline,
-  LinkOutline, EyeOutline, EyeOffOutline,
+  KeyOutline, CloudOutline, NotificationsOutline, FilmOutline,
+  ServerOutline, ShieldOutline, EyeOutline, EyeOffOutline,
+  SaveOutline, CopyOutline, InformationCircleOutline, LockClosedOutline,
 } from "@vicons/ionicons5";
-import { getSettings, type Settings } from "../api";
+import { api } from "../api";
+
+interface FieldMeta { value: string; is_secret: boolean; configured: boolean }
+interface SettingsResp { fields: Record<string, FieldMeta>; static: any }
 
 const message = useMessage();
-const s = ref<Settings | null>(null);
-const baseUrl = ref<string>("");
-const showToken = ref(false);
+const loading = ref(true);
+const saving = ref(false);
+const data = ref<SettingsResp | null>(null);
+
+// 各字段编辑值 (string)
+const form = ref<Record<string, string>>({});
+const reveal = ref<Record<string, boolean>>({});
+
+// 修改密码 modal
+const showPwdModal = ref(false);
+const pwdForm = ref({ old_password: "", new_password: "", confirm: "" });
+const pwdSaving = ref(false);
+
+// 字段定义 + 分组 + 元信息
+const groups = computed(() => [
+  {
+    title: "TMDB 刮削源", icon: FilmOutline, color: "#5b8def",
+    keys: ["TMDB_API_KEY", "TMDB_LANGUAGE"],
+    hint: "从 themoviedb.org 申请 API Key, 影响电影/剧集元数据刮削",
+  },
+  {
+    title: "Emby 集成", icon: CloudOutline, color: "#22c55e",
+    keys: ["EMBY_URL", "EMBY_API_KEY"],
+    hint: "扫描完成后自动触发 Emby 库刷新, 不配也不影响 strm 生成",
+  },
+  {
+    title: "CD2 Webhook", icon: NotificationsOutline, color: "#06b6d4",
+    keys: ["CD2_WEBHOOK_TOKEN", "CD2_MOUNT_ROOT"],
+    hint: "CD2 推送文件变更 -> fystrm 增量入库. Token 配在 CD2 的 webhook.toml authorization 头",
+  },
+  {
+    title: "日志", icon: ServerOutline, color: "#f59e0b",
+    keys: ["LOG_LEVEL"],
+    hint: "日志输出级别, 实时日志页 INFO+ 才推送",
+  },
+]);
+
+const fieldLabel: Record<string, string> = {
+  TMDB_API_KEY: "TMDB API Key",
+  TMDB_LANGUAGE: "TMDB 语言",
+  EMBY_URL: "Emby URL",
+  EMBY_API_KEY: "Emby API Key",
+  CD2_WEBHOOK_TOKEN: "Webhook Token",
+  CD2_MOUNT_ROOT: "CD2 容器挂载根",
+  LOG_LEVEL: "日志级别",
+};
+
+const fieldPlaceholder: Record<string, string> = {
+  TMDB_API_KEY: "32 位 API Key",
+  TMDB_LANGUAGE: "zh-CN / en-US ...",
+  EMBY_URL: "http://emby:8096",
+  EMBY_API_KEY: "Emby admin 生成的 API Key",
+  CD2_WEBHOOK_TOKEN: "Bearer token, 跟 CD2 toml authorization 头一致",
+  CD2_MOUNT_ROOT: "/mnt/CloudNAS",
+  LOG_LEVEL: "DEBUG / INFO / WARNING / ERROR",
+};
 
 async function load() {
-  s.value = await getSettings();
-  if (!baseUrl.value) {
-    baseUrl.value = `${window.location.protocol}//${window.location.host}`;
+  loading.value = true;
+  try {
+    const r = await api.get<SettingsResp>("/api/settings/");
+    data.value = r.data;
+    // 初始化 form
+    for (const k in r.data.fields) {
+      form.value[k] = r.data.fields[k].value || "";
+    }
+  } catch (e: any) {
+    message.error("加载配置失败: " + (e?.response?.data?.detail || e.message));
+  } finally {
+    loading.value = false;
   }
 }
 
-function genTOML(bu: string, token: string): string {
-  const tokenLine = token ? `Bearer ${token}` : `Bearer 在服务器 .env 配置 CD2_WEBHOOK_TOKEN`;
-  return `# CD2 webhook 配置 (粘贴到 CloudDrive2 webhook 配置文件)
-# 由 fystrm 自动生成
+async function saveGroup(keys: string[]) {
+  saving.value = true;
+  try {
+    const payload: Record<string, string> = {};
+    for (const k of keys) {
+      // 如果当前显示的是打码值, 用户没改动 -> 不提交
+      const orig = data.value?.fields[k];
+      const cur = form.value[k] || "";
+      if (orig?.is_secret && cur === orig.value && !reveal.value[k]) continue;
+      payload[k] = cur;
+    }
+    if (!Object.keys(payload).length) {
+      message.info("没有改动需要保存");
+      saving.value = false;
+      return;
+    }
+    await api.put("/api/settings/", { values: payload });
+    message.success("已保存");
+    await load();
+  } catch (e: any) {
+    message.error("保存失败: " + (e?.response?.data?.detail || e.message));
+  } finally {
+    saving.value = false;
+  }
+}
 
-[global_params]
+async function toggleReveal(k: string) {
+  if (!reveal.value[k]) {
+    // 拉明文
+    try {
+      const r = await api.get<SettingsResp>("/api/settings/?reveal=true");
+      form.value[k] = r.data.fields[k].value || "";
+      reveal.value[k] = true;
+    } catch (e: any) {
+      message.error("无权查看明文");
+    }
+  } else {
+    reveal.value[k] = false;
+    form.value[k] = data.value?.fields[k].value || "";
+  }
+}
+
+async function copyValue(k: string) {
+  let v = form.value[k];
+  // 如果是 secret + 没显示明文, 先拉明文
+  if (data.value?.fields[k].is_secret && !reveal.value[k]) {
+    const r = await api.get<SettingsResp>("/api/settings/?reveal=true");
+    v = r.data.fields[k].value;
+  }
+  if (!v) { message.warning("空值"); return; }
+  // fallback copy
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(v);
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = v; ta.style.position = "fixed"; ta.style.left = "-9999px";
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+  }
+  message.success("已复制");
+}
+
+async function submitPwd() {
+  if (!pwdForm.value.old_password || !pwdForm.value.new_password) {
+    message.warning("请填完整"); return;
+  }
+  if (pwdForm.value.new_password !== pwdForm.value.confirm) {
+    message.warning("两次新密码不一致"); return;
+  }
+  if (pwdForm.value.new_password.length < 6) {
+    message.warning("新密码至少 6 位"); return;
+  }
+  pwdSaving.value = true;
+  try {
+    await api.post("/api/settings/change-password", {
+      old_password: pwdForm.value.old_password,
+      new_password: pwdForm.value.new_password,
+    });
+    message.success("密码已更新, 下次登录用新密码");
+    showPwdModal.value = false;
+    pwdForm.value = { old_password: "", new_password: "", confirm: "" };
+  } catch (e: any) {
+    message.error(e?.response?.data?.detail || e.message);
+  } finally {
+    pwdSaving.value = false;
+  }
+}
+
+// CD2 toml 预览
+const tomlBaseUrl = ref("");
+const tomlPreview = computed(() => {
+  const token = (data.value?.fields["CD2_WEBHOOK_TOKEN"]?.value &&
+                 !data.value.fields["CD2_WEBHOOK_TOKEN"].is_secret) ? "******" :
+                (form.value.CD2_WEBHOOK_TOKEN || "未配置");
+  const bu = tomlBaseUrl.value || `${location.protocol}//${location.host}`;
+  return `[global_params]
 base_url = "${bu}"
 enabled = true
 time_format = "rfc3339"
 
 [global_params.default_headers]
+authorization = "Bearer <去掉 reveal 才看得到 token>"
 content-type = "application/json"
-user-agent = "clouddrive2/{version}"
-authorization = "${tokenLine}"
 
-
-# === 文件变更 webhook ===
 [file_system_watcher]
-url = "{base_url}/api/webhooks/cd2/file?device={device_name}&user={user_name}"
+url = "{base_url}/api/webhooks/cd2/file"
 method = "POST"
 enabled = true
-body = '''
-{
-    "device_name": "{device_name}",
-    "user_name": "{user_name}",
-    "version": "{version}",
-    "event_category": "{event_category}",
-    "event_name": "{event_name}",
-    "event_time": "{event_time}",
-    "send_time": "{send_time}",
-    "data": [
-        {
-            "action": "{action}",
-            "is_dir": "{is_dir}",
-            "source_file": "{source_file}",
-            "destination_file": "{destination_file}"
-        }
-    ]
-}
-'''
 
-
-# === 挂载点变更 webhook ===
 [mount_point_watcher]
-url = "{base_url}/api/webhooks/cd2/mount?device={device_name}&user={user_name}&type={event_name}"
+url = "{base_url}/api/webhooks/cd2/mount"
 method = "POST"
-enabled = true
-body = '''
-{
-    "device_name": "{device_name}",
-    "user_name": "{user_name}",
-    "version": "{version}",
-    "event_category": "{event_category}",
-    "event_name": "{event_name}",
-    "event_time": "{event_time}",
-    "send_time": "{send_time}",
-    "data": [
-        {
-            "action": "{action}",
-            "mount_point": "{mount_point}",
-            "status": "{status}",
-            "reason": "{reason}"
-        }
-    ]
-}
-'''
-`;
-}
-
-const tomlPreview = computed(() => {
-  if (!s.value) return "";
-  return genTOML(baseUrl.value, s.value.cd2_webhook_token || "");
+enabled = true`;
 });
 
-const maskedToken = computed(() => {
-  const t = s.value?.cd2_webhook_token || "";
-  if (!t) return "未配置";
-  if (showToken.value) return t;
-  return t.slice(0, 8) + "...".repeat(2) + t.slice(-8);
+onMounted(() => {
+  load();
+  tomlBaseUrl.value = `${location.protocol}//${location.host}`;
 });
-
-function copyText(text: string): boolean {
-  // 优先用 modern API (HTTPS / localhost)
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(() => {});
-    return true;
-  }
-  // fallback: 临时 textarea + execCommand (老 API, http 也行)
-  const ta = document.createElement("textarea");
-  ta.value = text;
-  ta.style.position = "fixed";
-  ta.style.left = "-9999px";
-  ta.style.opacity = "0";
-  document.body.appendChild(ta);
-  ta.select();
-  ta.setSelectionRange(0, text.length);
-  let ok = false;
-  try { ok = document.execCommand("copy"); } catch {}
-  document.body.removeChild(ta);
-  return ok;
-}
-
-async function copyTOML() {
-  if (copyText(tomlPreview.value)) {
-    message.success("已复制到剪贴板");
-  } else {
-    message.error("复制失败，请手动选择文本复制");
-  }
-}
-
-async function copyToken() {
-  if (!s.value?.cd2_webhook_token) return;
-  if (copyText(s.value.cd2_webhook_token)) {
-    message.success("Token 已复制");
-  } else {
-    message.error("复制失败");
-  }
-}
-
-onMounted(load);
 </script>
 
 <template>
-  <n-space vertical :size="20">
-    <!-- 基础设置 -->
-    <n-card title="设置" style="border-radius: 14px;">
-      <n-alert type="info" style="margin-bottom: 20px;" :show-icon="true">
-        <template #icon><n-icon :component="InformationCircleOutline" /></template>
-        v0.2 设置只读，编辑请改服务器 <code>/opt/fystrm/.env</code> 后重启容器。
-      </n-alert>
-      <n-descriptions v-if="s" :column="2" bordered label-placement="left">
-        <n-descriptions-item label="TMDB 已配置">
-          <n-tag :type="s.tmdb_configured ? 'success' : 'error'" round>{{ s.tmdb_configured ? '是' : '否' }}</n-tag>
-        </n-descriptions-item>
-        <n-descriptions-item label="TMDB 语言">{{ s.tmdb_language }}</n-descriptions-item>
-        <n-descriptions-item label="Emby 已配置">
-          <n-tag :type="s.emby_configured ? 'success' : 'warning'" round>{{ s.emby_configured ? '是' : '未配置（不影响扫描+strm 生成）' }}</n-tag>
-        </n-descriptions-item>
-        <n-descriptions-item label="Emby URL">{{ s.emby_url || '—' }}</n-descriptions-item>
-        <n-descriptions-item label="CD2 Webhook 已配置">
-          <n-tag :type="s.cd2_webhook_configured ? 'success' : 'warning'" round>{{ s.cd2_webhook_configured ? '是' : '未配置' }}</n-tag>
-        </n-descriptions-item>
-        <n-descriptions-item label="日志级别">{{ s.log_level }}</n-descriptions-item>
-      </n-descriptions>
-      <div style="margin-top: 16px;">
-        <n-button quaternary @click="load">
-          <template #icon><n-icon :component="RefreshOutline" /></template>
-          刷新
-        </n-button>
-      </div>
-    </n-card>
-
-    <!-- CD2 Webhook 配置预览 -->
-    <n-card title="CD2 Webhook 配置" style="border-radius: 14px;">
-      <template #header-extra>
-        <n-tag :type="s?.cd2_webhook_configured ? 'success' : 'warning'" size="small" round>
-          {{ s?.cd2_webhook_configured ? '已就绪' : '未生成 Token' }}
-        </n-tag>
-      </template>
-
-      <n-alert type="info" :show-icon="true" style="margin-bottom: 16px;">
-        <template #icon><n-icon :component="InformationCircleOutline" /></template>
-        把下面的 TOML 配置粘贴到 CloudDrive2 的 webhook 配置文件中即可。
-        文件路径通常是 <code>/Config/cloudd/webhooks.toml</code>。
-        粘贴后重启 CD2 生效。
-      </n-alert>
-
-      <!-- Base URL 可编辑 -->
-      <div style="margin-bottom: 14px;">
-        <div style="font-weight: 500; margin-bottom: 6px;">
-          <n-icon :component="LinkOutline" :size="16" style="vertical-align: -3px;" />
-          fystrm 访问地址 (CD2 推 webhook 用的)
-        </div>
-        <n-input
-          v-model:value="baseUrl"
-          placeholder="http://192.200.102.58:8095"
-        />
-        <div style="font-size: 12px; opacity: 0.6; margin-top: 4px;">
-          默认 = 当前浏览器访问的地址。如果 CD2 在另一台机器需要走公网/内网 IP，请改为 CD2 那台机器能访问到的地址。
-        </div>
-      </div>
-
-      <!-- Token 显示 + 复制 -->
-      <div style="margin-bottom: 16px;">
-        <div style="font-weight: 500; margin-bottom: 6px;">
-          <n-icon :component="KeyOutline" :size="16" style="vertical-align: -3px;" />
-          Webhook Token
-        </div>
-        <n-space :wrap="false">
-          <n-input :value="maskedToken" readonly style="font-family: ui-monospace, Menlo, Consolas, monospace;" />
-          <n-button @click="showToken = !showToken" quaternary>
-            <template #icon><n-icon :component="showToken ? EyeOffOutline : EyeOutline" /></template>
+  <n-spin :show="loading">
+    <n-space vertical :size="20">
+      <!-- 各分组 -->
+      <n-card v-for="g in groups" :key="g.title" :title="g.title" style="border-radius: 14px;">
+        <template #header-extra>
+          <n-button type="primary" size="small" :loading="saving" @click="saveGroup(g.keys)">
+            <template #icon><n-icon :component="SaveOutline" /></template>
+            保存
           </n-button>
-          <n-button @click="copyToken" :disabled="!s?.cd2_webhook_token">
-            <template #icon><n-icon :component="CopyOutline" /></template>
-            复制
+        </template>
+        <template #header>
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <n-icon :component="g.icon" :size="20" :color="g.color" />
+            <span>{{ g.title }}</span>
+          </span>
+        </template>
+
+        <n-alert v-if="g.hint" type="info" :show-icon="false" style="margin-bottom: 16px; font-size: 13px;">
+          {{ g.hint }}
+        </n-alert>
+
+        <n-form label-placement="left" label-width="160" :show-feedback="false">
+          <n-form-item v-for="k in g.keys" :key="k" :label="fieldLabel[k] || k">
+            <n-space :wrap="false" style="width: 100%;">
+              <n-input
+                v-model:value="form[k]"
+                :type="data?.fields[k]?.is_secret && !reveal[k] ? 'password' : 'text'"
+                :placeholder="fieldPlaceholder[k]"
+                style="flex: 1; min-width: 200px;"
+              />
+              <n-button v-if="data?.fields[k]?.is_secret" quaternary @click="toggleReveal(k)">
+                <template #icon><n-icon :component="reveal[k] ? EyeOffOutline : EyeOutline" /></template>
+              </n-button>
+              <n-button quaternary @click="copyValue(k)">
+                <template #icon><n-icon :component="CopyOutline" /></template>
+              </n-button>
+            </n-space>
+          </n-form-item>
+        </n-form>
+      </n-card>
+
+      <!-- 安全分组 -->
+      <n-card title="账号安全" style="border-radius: 14px;">
+        <template #header>
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <n-icon :component="ShieldOutline" :size="20" color="#ef4444" />
+            <span>账号安全</span>
+          </span>
+        </template>
+        <n-space vertical>
+          <n-button type="warning" @click="showPwdModal = true">
+            <template #icon><n-icon :component="LockClosedOutline" /></template>
+            修改管理员密码
           </n-button>
+          <span style="font-size: 12px; opacity: 0.6;">登录密码独立于其他配置, 单独修改</span>
         </n-space>
-        <div v-if="!s?.cd2_webhook_configured" style="font-size: 12px; color: #ef4444; margin-top: 4px;">
-          ⚠️ 服务器 .env 里还没设 CD2_WEBHOOK_TOKEN, webhook 端点会返回 503
-        </div>
-      </div>
+      </n-card>
+    </n-space>
+  </n-spin>
 
-      <!-- TOML 预览 + 复制 -->
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <div style="font-weight: 500;">TOML 配置预览</div>
-          <n-button @click="copyTOML" type="primary" size="small">
-            <template #icon><n-icon :component="CopyOutline" /></template>
-            复制全部
-          </n-button>
-        </div>
-        <n-code :code="tomlPreview" language="toml" word-wrap show-line-numbers />
-      </div>
-    </n-card>
-  </n-space>
+  <!-- 修改密码 Modal -->
+  <n-modal v-model:show="showPwdModal" preset="card" title="修改管理员密码" style="width: 460px;">
+    <n-form label-placement="top">
+      <n-form-item label="原密码">
+        <n-input v-model:value="pwdForm.old_password" type="password" show-password-on="click" />
+      </n-form-item>
+      <n-form-item label="新密码 (至少 6 位)">
+        <n-input v-model:value="pwdForm.new_password" type="password" show-password-on="click" />
+      </n-form-item>
+      <n-form-item label="确认新密码">
+        <n-input v-model:value="pwdForm.confirm" type="password" show-password-on="click" @keyup.enter="submitPwd" />
+      </n-form-item>
+      <n-button type="primary" block :loading="pwdSaving" @click="submitPwd">提交</n-button>
+    </n-form>
+  </n-modal>
 </template>

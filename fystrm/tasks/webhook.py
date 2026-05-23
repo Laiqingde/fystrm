@@ -40,6 +40,7 @@ def _normalize_cd2_path(path: str) -> str:
     转换规则: 如果 path 不以 cd2_mount_root 开头, 自动拼接前缀.
     """
     from fystrm.config import settings
+    from fystrm.core import dynamic_settings
     root = (settings.cd2_mount_root or "").rstrip("/")
     if not root or not path:
         return path
