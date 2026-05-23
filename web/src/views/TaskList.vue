@@ -8,7 +8,7 @@ import {
   EyeOutline, RefreshOutline, PulseOutline, CloseOutline,
   CheckmarkCircleOutline, AlertCircleOutline, TimeOutline, PlayCircleOutline,
 } from "@vicons/ionicons5";
-import { listTasks, type ScanTask } from "../api";
+import { listTasks, getToken, type ScanTask } from "../api";
 
 const tasks = ref<ScanTask[]>([]);
 const loading = ref(false);
@@ -35,7 +35,7 @@ function watch(task: ScanTask) {
   wsLogs.value = [];
   liveTaskId.value = task.id;
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const url = `${proto}://${location.host}/ws/tasks/${task.id}`;
+  const url = `${proto}://${location.host}/ws/tasks/${task.id}?token=${encodeURIComponent(getToken() || "")}`;
   ws = new WebSocket(url);
   ws.onmessage = (e) => {
     wsLogs.value.unshift(e.data);

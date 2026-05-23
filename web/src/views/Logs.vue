@@ -8,7 +8,7 @@ import {
   FilmOutline, SyncOutline, SearchOutline, ImageOutline, NotificationsOutline,
   CloudOutline, TerminalOutline,
 } from "@vicons/ionicons5";
-import { api } from "../api";
+import { api, getToken } from "../api";
 
 interface LogLine {
   ts: string;
@@ -112,7 +112,7 @@ async function loadHistory() {
 function connect() {
   if (ws) { ws.close(); ws = null; }
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${proto}://${location.host}/ws/logs`);
+  ws = new WebSocket(`${proto}://${location.host}/ws/logs?token=${encodeURIComponent(getToken() || "")}`);
   ws.onmessage = (e) => {
     try {
       const obj = JSON.parse(e.data) as LogLine;
