@@ -9,7 +9,6 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fystrm.core.queue import get_arq_pool
-from fystrm.core.auth import decode_token
 from fystrm.core.ws_hub import hub
 from fystrm.db import get_session
 from fystrm.models.library import Library
@@ -69,14 +68,6 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_session)) -> Sca
     if not t:
         raise HTTPException(404, "Task not found")
     return ScanTaskOut.model_validate(_serialize(t))
-
-
-@router.websocket("/ws/tasks/{task_id}")
-async def ws_task(ws: WebSocket, task_id: int, token: str = "") -> None:
-    if not token or decode_token(token) is None:
-        await ws.close(code=4401, reason="unauthorized")
-        return
-    await hub.serve(ws, task_id)
 
 
 def _serialize(t: ScanTask) -> dict:

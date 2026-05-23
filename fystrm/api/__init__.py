@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from fystrm.api import auth, dashboard, health, library, logs, media, scan, settings_api, transfer, webhooks
+from fystrm.api import auth, dashboard, health, library, logs, media, scan, settings_api, transfer, webhooks, ws
 from fystrm.api.auth import get_current_user
 
 api_router = APIRouter()
@@ -9,6 +9,7 @@ api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(webhooks.router)  # 用 Bearer token 自己鉴权
+api_router.include_router(ws.router)  # WebSocket 用 ?token=xxx 内部校验
 
 # 受保护路由 (需要 JWT)
 protected = [dashboard, library, scan, media, transfer, settings_api, logs]
