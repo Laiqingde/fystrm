@@ -79,6 +79,7 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
         if len(files) % 100 == 0:
             await _update_stage(task_id, "discovering", f"已发现 {len(files)} 个视频...")
 
+    total = len(files)
     async with SessionLocal() as db:
         task = await db.get(ScanTask, task_id)
         task.total_files = total
