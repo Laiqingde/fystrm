@@ -19,6 +19,7 @@ router = APIRouter(tags=["scan"])
 
 class ScanRequest(BaseModel):
     library_id: int
+    mode: str = "full"  # full | incremental
 
 
 class ScanTaskOut(BaseModel):
@@ -51,7 +52,7 @@ async def start_scan(req: ScanRequest, db: AsyncSession = Depends(get_session)) 
     await db.refresh(task)
 
     pool = await get_arq_pool()
-    await pool.enqueue_job("scan_library_task", task.id, _job_id=f"scan:{task.id}")
+    await pool.enqueue_job("scan_library_task", task.id, req.mode, _job_id=f"scan:{task.id}")
 
     return ScanTaskOut.model_validate(_serialize(task))
 

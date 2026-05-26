@@ -3,6 +3,7 @@ import { onMounted, ref, h, computed, watch } from "vue";
 import {
   NCard, NDataTable, NButton, NSpace, NModal, NForm, NFormItem, NInput, NSelect,
   NTag, NPopconfirm, NIcon, NTooltip, NCheckbox, NSwitch, useMessage,
+  NDropdown,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
 import {
@@ -130,9 +131,13 @@ function onModalClose(v: boolean) {
   if (!v) resetModal();
 }
 
-async function onScan(lib: Library) {
-  try { const t = await startScan(lib.id); message.success(`扫描已入队 task #${t.id}`); }
-  catch (e: any) { message.error("扫描启动失败: " + (e?.response?.data?.detail || e.message)); }
+async function onScan(lib: Library, mode: "full" | "incremental" = "full") {
+  try {
+    const t = await startScan(lib.id, mode);
+    message.success(`${mode === "incremental" ? "增量" : "全量"}扫描已入队 task #${t.id}`);
+  } catch (e: any) {
+    message.error("扫描启动失败: " + (e?.response?.data?.detail || e.message));
+  }
 }
 
 async function onDelete(lib: Library) {
@@ -213,9 +218,18 @@ const columns: DataTableColumns<Library> = [
     title: "操作", key: "actions", width: 220,
     render(row) {
       return h(NSpace, { size: 6 }, () => [
-        h(NButton, { size: "small", type: "primary", onClick: () => onScan(row) }, {
-          icon: () => h(NIcon, { component: PlayOutline }),
-          default: () => "扫描",
+        h(NDropdown, {
+          trigger: "click",
+          options: [
+            { label: "全量扫描 (重刮所有)", key: "full" },
+            { label: "增量扫描 (只补新增)", key: "incremental" },
+          ],
+          onSelect: (key: string) => onScan(row, key as "full" | "incremental"),
+        }, {
+          default: () => h(NButton, { size: "small", type: "primary" }, {
+            icon: () => h(NIcon, { component: PlayOutline }),
+            default: () => "扫描",
+          }),
         }),
         h(NButton, { size: "small", quaternary: true, onClick: () => onEdit(row) }, {
           icon: () => h(NIcon, { component: CreateOutline }),

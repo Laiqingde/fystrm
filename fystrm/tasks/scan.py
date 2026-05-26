@@ -44,7 +44,7 @@ def _make_strm_ctx(library: Library, source_path: str) -> StrmContext:
     )
 
 
-async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
+async def scan_library_task(ctx: dict, task_id: int, mode: str = "full") -> dict[str, Any]:
     logger.info("scan_library_task start, task_id={}", task_id)
     async with SessionLocal() as db:
         task = await db.get(ScanTask, task_id)
@@ -85,7 +85,7 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
         task.total_files = total
         await db.commit()
     await publish(task_id, {"event": "discovered", "total": total})
-    await _update_stage(task_id, "processing", f"处理视频 0/{total}")
+    await _update_stage(task_id, "processing", f"{'增量' if mode == 'incremental' else '全量'}处理 0/{total}")
 
     # Per-task cache: 同剧集只写一次 tvshow.nfo
     tvshow_lock: set[str] = set()
@@ -107,6 +107,7 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
                 target_root=target_root,
                 tvshow_lock=tvshow_lock,
                 tv_meta_cache=tv_meta_cache,
+                mode=mode,
             )
             if outcome in ("done", "no_scrape"):
                 success += 1; event = "file_done"
@@ -175,8 +176,18 @@ async def scan_library_task(ctx: dict, task_id: int) -> dict[str, Any]:
     return {"status": "done", "success": success, "failed": failed, "skipped": skipped}
 
 
-async def _process_one(*, lib, sf, meta_plugin, strm_plugin, target_root, tvshow_lock, tv_meta_cache) -> str:
+async def _process_one(*, lib, sf, meta_plugin, strm_plugin, target_root, tvshow_lock, tv_meta_cache, mode: str = "full") -> str:
     """Returns: "done" | "skipped" | "failed" | "no_scrape"."""
+    # 增量模式: 已入库 (done/no_scrape/skipped) 的文件直接跳过, 只处理新增
+    if mode == "incremental":
+        async with SessionLocal() as db:
+            res = await db.execute(
+                select(MediaItem).where(MediaItem.source_file_path == sf.drive_file.path)
+            )
+            existing = res.scalar_one_or_none()
+        if existing is not None and existing.scrape_status in ("done", "no_scrape", "skipped"):
+            return "skipped"
+
     # 刮削开关关闭 -> 只生成 strm, 不调 TMDB, 不写 movie.nfo, 不下载海报
     if not lib.scrape_enabled:
         return await _process_no_scrape(lib, sf, strm_plugin, target_root)

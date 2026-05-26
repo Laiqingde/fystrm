@@ -75,7 +75,7 @@ export const listLibraries = () => api.get<Library[]>("/api/libraries/").then(r 
 export const createLibrary = (data: Partial<Library>) => api.post<Library>("/api/libraries/", data).then(r => r.data);
 export const updateLibrary = (id: number, data: Partial<Library>) => api.put<Library>(`/api/libraries/${id}`, data).then(r => r.data);
 export const deleteLibrary = (id: number) => api.delete(`/api/libraries/${id}`);
-export const startScan = (library_id: number) => api.post<ScanTask>("/api/scan", { library_id }).then(r => r.data);
+export const startScan = (library_id: number, mode: "full" | "incremental" = "full") => api.post<ScanTask>("/api/scan", { library_id, mode }).then(r => r.data);
 export const listTasks = (limit = 50) => api.get<ScanTask[]>(`/api/tasks?limit=${limit}`).then(r => r.data);
 export const getTask = (id: number) => api.get<ScanTask>(`/api/tasks/${id}`).then(r => r.data);
 export const listMedia = (library_id?: number, status?: string) => {
