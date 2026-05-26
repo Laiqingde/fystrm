@@ -147,3 +147,18 @@ export const login = (username: string, password: string) =>
   ).then(r => r.data);
 
 export const fetchMe = () => api.get<AuthUser>("/api/auth/me").then(r => r.data);
+
+
+// 把 UTC ISO 时间转成上海时间显示 (YYYY-MM-DD HH:mm:ss)
+export function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  const s = d.toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  });
+  return s.replace(/\//g, "-");
+}

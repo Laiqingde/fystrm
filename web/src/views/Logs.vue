@@ -8,7 +8,7 @@ import {
   FilmOutline, SyncOutline, SearchOutline, ImageOutline, NotificationsOutline,
   CloudOutline, TerminalOutline,
 } from "@vicons/ionicons5";
-import { api, getToken } from "../api";
+import { api, getToken, fmtDateTime } from "../api";
 
 interface LogLine {
   ts: string;
@@ -130,7 +130,7 @@ function scrollToBottom() {
 }
 
 function fmtTime(ts: string) {
-  return ts.replace("T", " ").replace(/\.\d+Z$/, "").substring(0, 19);
+  return fmtDateTime(ts);
 }
 
 function shortModule(m: string) {

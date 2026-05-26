@@ -51,6 +51,7 @@ services:
       POSTGRES_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TZ: Asia/Shanghai
     volumes:
       - ./scan-source:/scan-source:ro
       - ./media:/media
@@ -82,6 +83,7 @@ services:
       POSTGRES_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TZ: Asia/Shanghai
     volumes:
       - ./scan-source:/scan-source:ro
       - ./media:/media

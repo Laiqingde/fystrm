@@ -8,7 +8,7 @@ import {
   EyeOutline, RefreshOutline, PulseOutline, CloseOutline,
   CheckmarkCircleOutline, AlertCircleOutline, TimeOutline, PlayCircleOutline,
 } from "@vicons/ionicons5";
-import { listTasks, getToken, type ScanTask } from "../api";
+import { listTasks, getToken, fmtDateTime, type ScanTask } from "../api";
 
 const tasks = ref<ScanTask[]>([]);
 const loading = ref(false);
@@ -105,8 +105,8 @@ const columns: DataTableColumns<ScanTask> = [
       ]);
     },
   },
-  { title: "开始", key: "started_at", width: 170, render: (r) => r.started_at?.replace("T", " ").substring(0, 19) || "—" },
-  { title: "结束", key: "finished_at", width: 170, render: (r) => r.finished_at?.replace("T", " ").substring(0, 19) || "—" },
+  { title: "开始", key: "started_at", width: 170, render: (r) => fmtDateTime(r.started_at) },
+  { title: "结束", key: "finished_at", width: 170, render: (r) => fmtDateTime(r.finished_at) },
   {
     title: "操作", key: "actions", width: 100,
     render(row) {
